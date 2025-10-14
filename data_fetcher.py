@@ -12,9 +12,10 @@ class DataFetcher:
         """
         base_url = "http://api.census.gov/data/2020/dec/pl"
 
-        # Specify the variables to retrieve (e.g., total population)
+        # Specify the variables to retrieve (e.g., total population and race)
         # P1_001N is the total population
-        get_vars = "NAME,P1_001N"
+        # P1_003N to P1_008N are race categories
+        get_vars = "NAME,P1_001N,P1_003N,P1_004N,P1_005N,P1_006N,P1_007N,P1_008N"
 
         # Specify the geography (all blocks in a state)
         for_geo = f"&for=block:*&in=state:{state_fips}"
@@ -26,6 +27,31 @@ class DataFetcher:
             response = requests.get(url)
             response.raise_for_status()  # Raise an exception for bad status codes
             return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"An error occurred: {e}")
+            return None
+
+    def get_all_states_population_data(self):
+        """
+        Fetches the total population for all states.
+        """
+        base_url = "http://api.census.gov/data/2020/dec/pl"
+        get_vars = "NAME,P1_001N"
+        for_geo = "&for=state:*"
+        url = f"{base_url}?get={get_vars}{for_geo}"
+
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            data = response.json()
+
+            # Convert to a dictionary of FIPS codes to populations
+            state_populations = {}
+            for row in data[1:]:  # Skip header row
+                state_fips = row[2]
+                population = int(row[1])
+                state_populations[state_fips] = population
+            return state_populations
         except requests.exceptions.RequestException as e:
             print(f"An error occurred: {e}")
             return None

@@ -12,6 +12,7 @@ This project is a congressional redistricting application that automatically gen
 -   **`data_fetcher.py`:** This module is responsible for fetching census data and shapefiles from the US Census Bureau.
 -   **`redistricting_algorithms.py`:** This module contains the implementation of the redistricting algorithms, including the "Divide and Conquer" algorithm and the gerrymandering algorithm.
 -   **`map_generator.py`:** This module is responsible for generating map images and exporting district data to shapefiles.
+-   **`apportionment.py`:** This module contains the logic for the Huntington-Hill apportionment method.
 
 ## Development Guidelines
 
@@ -20,10 +21,11 @@ This project is a congressional redistricting application that automatically gen
 -   **Error Handling:** Implement robust error handling, especially for network requests and file operations.
 -   **Testing:** While there are no automated tests at the moment, it is highly encouraged to add them in the future.
 
-## Future Enhancements
+## Implemented Enhancements
 
--   **More Sophisticated Algorithms:** The current gerrymandering algorithm is a simplified placeholder. It could be replaced with a more advanced implementation of "packing and cracking."
--   **VRA Compliance Logic:** The VRA compliance is currently a boolean flag. The actual logic for ensuring VRA compliance needs to be implemented in the redistricting algorithms.
--   **Additional Criteria:** The application could be extended to support other redistricting criteria, such as preserving communities of interest.
--   **Expanded State List:** The state selection dropdown currently only lists California. This should be expanded to include all US states.
--   **Performance Optimization:** For larger states, the redistricting process can be slow. The performance of the algorithms could be optimized.
+-   **Huntington-Hill Apportionment:** The application now allows users to set the total size of the U.S. House of Representatives and uses the Huntington-Hill method to apportion districts to each state.
+-   **VRA Compliance Logic:** The VRA compliance logic has been implemented in the redistricting algorithms to prevent the "cracking" of minority communities.
+-   **Enhanced Gerrymandering Algorithm:** The gerrymandering algorithm has been enhanced to use a partisan score to create a partisan advantage.
+-   **Support for Communities of Interest:** The application now supports the preservation of communities of interest by allowing users to upload a CSV file of GEOIDs.
+-   **Expanded State List:** The state selection dropdown is now populated with a complete list of US states.
+-   **Performance Optimization:** The redistricting algorithm has been parallelized to improve performance on multi-core systems.
