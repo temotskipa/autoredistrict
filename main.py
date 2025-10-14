@@ -1,5 +1,6 @@
 import sys
 import json
+import us
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
@@ -135,7 +136,6 @@ class MainWindow(QMainWindow):
                 if api_key:
                     self.api_key_input.setText(api_key)
         except (FileNotFoundError, json.JSONDecodeError):
-            # It's okay if the file doesn't exist or is malformed.
             pass
 
     def _save_api_key(self):
@@ -165,27 +165,11 @@ class MainWindow(QMainWindow):
         # Populate the state dropdown
         self.state_combo.clear()
 
-        states = {
-            "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas", "06": "California",
-            "08": "Colorado", "09": "Connecticut", "10": "Delaware",
-            "12": "Florida", "13": "Georgia", "15": "Hawaii", "16": "Idaho", "17": "Illinois",
-            "18": "Indiana", "19": "Iowa", "20": "Kansas", "21": "Kentucky", "22": "Louisiana",
-            "23": "Maine", "24": "Maryland", "25": "Massachusetts", "26": "Michigan",
-            "27": "Minnesota", "28": "Mississippi", "29": "Missouri", "30": "Montana",
-            "31": "Nebraska", "32": "Nevada", "33": "New Hampshire", "34": "New Jersey",
-            "35": "New Mexico", "36": "New York", "37": "North Carolina", "38": "North Dakota",
-            "39": "Ohio", "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania",
-            "44": "Rhode Island", "45": "South Carolina", "46": "South Dakota", "47": "Tennessee",
-            "48": "Texas", "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
-            "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming"
-        }
-
-        for fips, name in states.items():
-            if fips in self.apportionment:
-                self.state_combo.addItem(name, userData=fips)
+        for state in us.states.STATES:
+            if state.fips in self.apportionment:
+                self.state_combo.addItem(state.name, userData=state.fips)
 
         self.state_combo.setEnabled(True)
-        self.run_button.setEnabled(True)
         self.update_num_districts()
 
     def update_num_districts(self):

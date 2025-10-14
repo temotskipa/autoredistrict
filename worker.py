@@ -43,7 +43,7 @@ class DataFetcherWorker(QObject):
             return None
 
     def _get_census_data(self, state_fips):
-        fields = ('NAME', 'P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N')
+        fields = ('NAME', 'P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N', 'state', 'county', 'tract', 'block')
 
         counties = self._get_counties_for_state(state_fips)
         if not counties:
@@ -74,7 +74,7 @@ class DataFetcherWorker(QObject):
         filename = f"tl_2024_{state_fips}_tabblock20.zip"
         url = f"{base_url}{filename}"
         try:
-            response = requests.get(url)
+            response = self.c.session.get(url)
             response.raise_for_status()
             with open(filename, 'wb') as f:
                 f.write(response.content)
@@ -82,7 +82,7 @@ class DataFetcherWorker(QObject):
                 zip_ref.extractall(f"shapefiles_{state_fips}")
             os.remove(filename)
             return f"shapefiles_{state_fips}"
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             print(f"An error occurred while downloading the shapefile: {e}")
             return None
         except zipfile.BadZipFile:

@@ -1,4 +1,5 @@
 from census import Census
+import us
 
 class DataFetcher:
     def __init__(self, api_key):
@@ -11,7 +12,8 @@ class DataFetcher:
         """
         try:
             data = self.c.pl.state(('NAME', 'P1_001N'), Census.ALL)
-            state_populations = {item['state']: int(item['P1_001N']) for item in data}
+            state_fips_list = [state.fips for state in us.states.STATES]
+            state_populations = {item['state']: int(item['P1_001N']) for item in data if item['state'] in state_fips_list}
             return state_populations
         except Exception as e:
             print(f"An error occurred: {e}")
