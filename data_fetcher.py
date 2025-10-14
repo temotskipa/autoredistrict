@@ -12,9 +12,10 @@ class DataFetcher:
         """
         base_url = "http://api.census.gov/data/2020/dec/pl"
 
-        # Specify the variables to retrieve (e.g., total population)
+        # Specify the variables to retrieve (e.g., total population and race)
         # P1_001N is the total population
-        get_vars = "NAME,P1_001N"
+        # P1_003N to P1_008N are race categories
+        get_vars = "NAME,P1_001N,P1_003N,P1_004N,P1_005N,P1_006N,P1_007N,P1_008N"
 
         # Specify the geography (all blocks in a state)
         for_geo = f"&for=block:*&in=state:{state_fips}"

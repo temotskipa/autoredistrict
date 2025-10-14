@@ -15,6 +15,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         self.map_generator = None
         self.apportionment = None
+        self.coi_file_path = None
         super().__init__()
         self.setWindowTitle('Congressional Redistricting')
 
@@ -75,6 +76,15 @@ class MainWindow(QMainWindow):
         self.compactness_slider.setValue(100)
         controls_layout.addWidget(self.compactness_slider)
 
+        # Community of Interest
+        coi_layout = QHBoxLayout()
+        self.coi_upload_button = QPushButton('Upload COI File')
+        self.coi_upload_button.clicked.connect(self.upload_coi_file)
+        coi_layout.addWidget(self.coi_upload_button)
+        self.coi_file_label = QLabel('No file uploaded.')
+        coi_layout.addWidget(self.coi_file_label)
+        controls_layout.addLayout(coi_layout)
+
         # Algorithm selection
         controls_layout.addWidget(QLabel('Select Algorithm:'))
         self.algorithm_combo = QComboBox()
@@ -105,6 +115,12 @@ class MainWindow(QMainWindow):
         # Add layouts to main layout
         main_layout.addLayout(controls_layout)
         main_layout.addWidget(self.map_view)
+
+    def upload_coi_file(self):
+        file_path, _ = QFileDialog.getOpenFileName(self, "Upload COI File", "", "CSV Files (*.csv)")
+        if file_path:
+            self.coi_file_path = file_path
+            self.coi_file_label.setText(file_path.split('/')[-1])
 
     def run_apportionment_calculation(self):
         fetcher = DataFetcher()
@@ -182,11 +198,18 @@ class MainWindow(QMainWindow):
         pop_equality_weight = self.pop_equality_slider.value() / 100.0
         compactness_weight = self.compactness_slider.value() / 100.0
 
+        # Load COI data if a file has been uploaded
+        coi_data = None
+        if self.coi_file_path:
+            coi_df = pd.read_csv(self.coi_file_path)
+            coi_data = list(coi_df['GEOID'])
+
         # Run the selected algorithm
         algorithm = RedistrictingAlgorithm(merged_gdf, num_districts,
                                            population_equality_weight=pop_equality_weight,
                                            compactness_weight=compactness_weight,
-                                           vra_compliance=vra_compliance)
+                                           vra_compliance=vra_compliance,
+                                           communities_of_interest=coi_data)
 
         if "Divide and Conquer" in algorithm_name:
             districts_list = algorithm.divide_and_conquer()
