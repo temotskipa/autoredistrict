@@ -8,9 +8,10 @@ class DataFetcherWorker(QObject):
     finished = pyqtSignal(pd.DataFrame, str)
     error = pyqtSignal(str)
 
-    def __init__(self, state_fips):
+    def __init__(self, state_fips, api_key):
         super().__init__()
         self.state_fips = state_fips
+        self.api_key = api_key
 
     def fetch_data(self):
         try:
@@ -28,7 +29,7 @@ class DataFetcherWorker(QObject):
         base_url = "https://api.census.gov/data/2020/dec/pl"
         get_vars = "NAME"
         for_geo = f"&for=county:*&in=state:{state_fips}"
-        url = f"{base_url}?get={get_vars}{for_geo}"
+        url = f"{base_url}?get={get_vars}{for_geo}&key={self.api_key}"
         try:
             response = requests.get(url)
             response.raise_for_status()
@@ -51,7 +52,7 @@ class DataFetcherWorker(QObject):
 
         for county_fips in counties:
             for_geo = f"&for=block:*&in=state:{state_fips}&in=county:{county_fips}"
-            url = f"{base_url}?get={get_vars}{for_geo}"
+            url = f"{base_url}?get={get_vars}{for_geo}&key={self.api_key}"
             try:
                 response = requests.get(url)
                 response.raise_for_status()

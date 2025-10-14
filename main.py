@@ -1,5 +1,5 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
@@ -28,6 +28,13 @@ class MainWindow(QMainWindow):
 
         # Controls layout
         controls_layout = QVBoxLayout()
+
+        # API Key
+        api_key_layout = QHBoxLayout()
+        api_key_layout.addWidget(QLabel('Census API Key:'))
+        self.api_key_input = QLineEdit()
+        api_key_layout.addWidget(self.api_key_input)
+        controls_layout.addLayout(api_key_layout)
 
         # House size
         house_size_layout = QHBoxLayout()
@@ -124,7 +131,8 @@ class MainWindow(QMainWindow):
             self.coi_file_label.setText(file_path.split('/')[-1])
 
     def run_apportionment_calculation(self):
-        fetcher = DataFetcher()
+        api_key = self.api_key_input.text()
+        fetcher = DataFetcher(api_key)
         state_populations = fetcher.get_all_states_population_data()
 
         if not state_populations:
@@ -169,11 +177,12 @@ class MainWindow(QMainWindow):
 
     def run_redistricting(self):
         state_fips = self.state_combo.currentData()
+        api_key = self.api_key_input.text()
         self.run_button.setEnabled(False)
         self.run_button.setText("Generating...")
 
         self.thread = QThread()
-        self.worker = DataFetcherWorker(state_fips)
+        self.worker = DataFetcherWorker(state_fips, api_key)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.fetch_data)

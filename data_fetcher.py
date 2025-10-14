@@ -1,8 +1,8 @@
 import requests
 
 class DataFetcher:
-    def __init__(self):
-        self.api_key = None  # It's good practice to use an API key if required
+    def __init__(self, api_key):
+        self.api_key = api_key
 
     def get_all_states_population_data(self):
         """
@@ -11,7 +11,7 @@ class DataFetcher:
         base_url = "http://api.census.gov/data/2020/dec/pl"
         get_vars = "NAME,P1_001N"
         for_geo = "&for=state:*"
-        url = f"{base_url}?get={get_vars}{for_geo}"
+        url = f"{base_url}?get={get_vars}{for_geo}&key={self.api_key}"
 
         try:
             response = requests.get(url)
