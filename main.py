@@ -228,9 +228,22 @@ class MainWindow(QMainWindow):
         self._save_api_key()
         state_fips = self.state_combo.currentData()
         api_key = self.api_key_input.text()
+
+        # Disable UI controls
+        self.api_key_input.setEnabled(False)
+        self.house_size_spinbox.setEnabled(False)
+        self.calculate_apportionment_button.setEnabled(False)
+        self.state_combo.setEnabled(False)
+        self.vra_checkbox.setEnabled(False)
+        self.pop_equality_slider.setEnabled(False)
+        self.compactness_slider.setEnabled(False)
+        self.coi_upload_button.setEnabled(False)
+        self.algorithm_combo.setEnabled(False)
         self.run_button.setEnabled(False)
         self.export_png_button.setEnabled(False)
         self.export_shapefile_button.setEnabled(False)
+        self.clear_cache_button.setEnabled(False)
+
         self.run_button.setText("Generating...")
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
@@ -285,6 +298,25 @@ class MainWindow(QMainWindow):
 
         self.redistricting_thread.start()
 
+    def _re_enable_ui_controls(self):
+        """Re-enables all UI controls after processing is finished or an error occurs."""
+        self.api_key_input.setEnabled(True)
+        self.house_size_spinbox.setEnabled(True)
+        self.calculate_apportionment_button.setEnabled(True)
+        self.state_combo.setEnabled(True)
+        self.vra_checkbox.setEnabled(True)
+        self.pop_equality_slider.setEnabled(True)
+        self.compactness_slider.setEnabled(True)
+        self.coi_upload_button.setEnabled(True)
+        self.algorithm_combo.setEnabled(True)
+        self.run_button.setEnabled(True)
+        # Note: Export buttons are not re-enabled here as they depend on a generated map.
+        self.clear_cache_button.setEnabled(True)
+        self.run_button.setText("Generate Map")
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setFormat("")
+        self.update_num_districts() # Re-evaluates if run_button should be enabled
+
     def handle_redistricting_finished(self, districts_list):
         all_districts_gdf = gpd.GeoDataFrame()
         for i, district_gdf in enumerate(districts_list):
@@ -296,26 +328,17 @@ class MainWindow(QMainWindow):
         self.map_scene.clear()
         self.map_scene.addPixmap(QPixmap(map_image_path))
 
+        self._re_enable_ui_controls()
         self.export_png_button.setEnabled(True)
         self.export_shapefile_button.setEnabled(True)
-        self.run_button.setEnabled(True)
-        self.run_button.setText("Generate Map")
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFormat("")
 
     def handle_redistricting_error(self, error_message):
         QMessageBox.critical(self, "Error", f"Failed to run redistricting: {error_message}")
-        self.run_button.setEnabled(True)
-        self.run_button.setText("Generate Map")
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFormat("")
+        self._re_enable_ui_controls()
 
     def handle_data_fetch_error(self, error_message):
         QMessageBox.critical(self, "Error", f"Failed to fetch data: {error_message}")
-        self.run_button.setEnabled(True)
-        self.run_button.setText("Generate Map")
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFormat("")
+        self._re_enable_ui_controls()
 
     def export_as_png(self):
         if self.map_generator:
