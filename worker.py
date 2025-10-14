@@ -43,7 +43,7 @@ class DataFetcherWorker(QObject):
             return None
 
     def _get_census_data(self, state_fips):
-        fields = ('NAME', 'P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N', 'state', 'county', 'tract', 'block')
+        fields = ('NAME', 'P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N')
 
         counties = self._get_counties_for_state(state_fips)
         if not counties:
