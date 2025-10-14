@@ -1,6 +1,7 @@
 import requests
 import os
 import zipfile
+import time
 import pandas as pd
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -41,7 +42,7 @@ class DataFetcherWorker(QObject):
 
     def _get_census_data(self, state_fips):
         base_url = "https://api.census.gov/data/2020/dec/pl"
-        get_vars = "NAME,P1_001N,P1_003N,P1_004N,P1_005N,P1_006N,P1_007N,P1_008N,state,county,tract,block"
+        get_vars = "NAME,P1_001N,P1_003N,P1_004N,P1_005N,P1_006N,P1_007N,P1_008N"
 
         counties = self._get_counties_for_state(state_fips)
         if not counties:
@@ -65,6 +66,7 @@ class DataFetcherWorker(QObject):
             except requests.exceptions.RequestException as e:
                 print(f"An error occurred for county {county_fips}: {e}")
                 continue
+            time.sleep(0.2)
 
         if not all_census_data:
             return None
