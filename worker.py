@@ -86,7 +86,8 @@ class DataFetcherWorker(QObject):
         return df
 
     def _get_shapefiles(self, state_fips):
-        shapefile_dir = f"shapefiles_{state_fips}"
+        cache_dir = ".cache"
+        shapefile_dir = os.path.join(cache_dir, f"shapefiles_{state_fips}")
         base_url = "https://www2.census.gov/geo/tiger/TIGER2024/TABBLOCK20/"
         filename = f"tl_2024_{state_fips}_tabblock20.zip"
         url = f"{base_url}{filename}"

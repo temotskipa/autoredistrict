@@ -146,25 +146,12 @@ class MainWindow(QMainWindow):
 
     def clear_cache(self):
         cache_dir = ".cache"
-        shapefile_dirs = glob.glob("shapefiles_*")
-        deleted_something = False
-
         try:
             if os.path.exists(cache_dir):
                 shutil.rmtree(cache_dir)
-                print(f"Removed cache directory: {cache_dir}")
-                deleted_something = True
-
-            for d in shapefile_dirs:
-                shutil.rmtree(d)
-                print(f"Removed shapefile directory: {d}")
-                deleted_something = True
-
-            if deleted_something:
-                QMessageBox.information(self, "Cache Cleared", "The data cache has been cleared successfully.")
+                QMessageBox.information(self, "Cache Cleared", f"The cache directory ({cache_dir}) has been cleared successfully.")
             else:
-                QMessageBox.information(self, "Cache Cleared", "No cache files found to clear.")
-
+                QMessageBox.information(self, "Cache Cleared", "No cache directory found to clear.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred while clearing the cache: {e}")
 
