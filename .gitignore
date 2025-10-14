@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+
+# IDE files
+.idea/
+.vscode/
+
+# Temporary files
+temp_map.png
+*.zip
+shapefiles_*/
