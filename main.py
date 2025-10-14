@@ -4,6 +4,7 @@ import us
 import shutil
 import glob
 import os
+import platform
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit, QProgressBar
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
@@ -73,6 +74,13 @@ class MainWindow(QMainWindow):
         # VRA compliance
         self.vra_checkbox = QCheckBox('Enable VRA Compliance')
         controls_layout.addWidget(self.vra_checkbox)
+
+        # GPU acceleration
+        self.gpu_checkbox = QCheckBox('Use GPU Acceleration')
+        if platform.system() == "Windows":
+            self.gpu_checkbox.setEnabled(False)
+            self.gpu_checkbox.setToolTip("GPU acceleration is not supported on native Windows. Please use WSL2 or Linux.")
+        controls_layout.addWidget(self.gpu_checkbox)
 
         # Population equality weight
         controls_layout.addWidget(QLabel('Population Equality Weight:'))
@@ -216,12 +224,15 @@ class MainWindow(QMainWindow):
         state_fips = self.state_combo.currentData()
         api_key = self.api_key_input.text()
 
+        use_gpu = self.gpu_checkbox.isChecked()
+
         # Disable UI controls
         self.api_key_input.setEnabled(False)
         self.house_size_spinbox.setEnabled(False)
         self.calculate_apportionment_button.setEnabled(False)
         self.state_combo.setEnabled(False)
         self.vra_checkbox.setEnabled(False)
+        self.gpu_checkbox.setEnabled(False)
         self.pop_equality_slider.setEnabled(False)
         self.compactness_slider.setEnabled(False)
         self.coi_upload_button.setEnabled(False)
@@ -237,7 +248,7 @@ class MainWindow(QMainWindow):
         self.progress_bar.setFormat("Fetching data... %p%")
 
         self.thread = QThread()
-        self.worker = DataFetcherWorker(state_fips, api_key)
+        self.worker = DataFetcherWorker(state_fips, api_key, use_gpu)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.fetch_data)
@@ -250,17 +261,21 @@ class MainWindow(QMainWindow):
 
         self.thread.start()
 
-    def handle_data_fetched(self, census_df, shapefile_path):
+    def handle_data_fetched(self, merged_gdf):
         self.progress_bar.setValue(0)
         self.progress_bar.setFormat("Redistricting... %p%")
         self.run_button.setText("Redistricting...")
 
-        state_gdf = gpd.read_file(shapefile_path)
-        state_gdf['GEOID'] = state_gdf['GEOID20']
-        merged_gdf = state_gdf.merge(census_df, on='GEOID')
+        use_gpu = self.gpu_checkbox.isChecked()
 
-        np.random.seed(0)
-        merged_gdf['party'] = np.random.rand(len(merged_gdf))
+        # Add party affiliation data
+        if hasattr(merged_gdf, 'to_pandas'): # Check if it's a cuDF DataFrame
+            import cupy as cp
+            cp.random.seed(0)
+            merged_gdf['party'] = cp.random.rand(len(merged_gdf))
+        else: # It's a pandas DataFrame
+            np.random.seed(0)
+            merged_gdf['party'] = np.random.rand(len(merged_gdf))
 
         self.redistricting_thread = QThread()
         self.redistricting_worker = RedistrictingWorker(
@@ -270,7 +285,8 @@ class MainWindow(QMainWindow):
             population_equality_weight=self.pop_equality_slider.value() / 100.0,
             compactness_weight=self.compactness_slider.value() / 100.0,
             vra_compliance=self.vra_checkbox.isChecked(),
-            communities_of_interest=self.coi_file_path
+            communities_of_interest=self.coi_file_path,
+            use_gpu=use_gpu
         )
         self.redistricting_worker.moveToThread(self.redistricting_thread)
 
@@ -292,6 +308,7 @@ class MainWindow(QMainWindow):
         self.calculate_apportionment_button.setEnabled(True)
         self.state_combo.setEnabled(True)
         self.vra_checkbox.setEnabled(True)
+        self.gpu_checkbox.setEnabled(True)
         self.pop_equality_slider.setEnabled(True)
         self.compactness_slider.setEnabled(True)
         self.coi_upload_button.setEnabled(True)
@@ -305,6 +322,10 @@ class MainWindow(QMainWindow):
         self.update_num_districts() # Re-evaluates if run_button should be enabled
 
     def handle_redistricting_finished(self, districts_list):
+        if districts_list and hasattr(districts_list[0], 'to_pandas'):
+            # Convert cuDF GeoDataFrames to GeoPandas DataFrames
+            districts_list = [d.to_pandas() for d in districts_list]
+
         all_districts_gdf = gpd.GeoDataFrame()
         for i, district_gdf in enumerate(districts_list):
             district_gdf['district_id'] = i
