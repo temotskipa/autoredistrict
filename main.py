@@ -197,6 +197,7 @@ class MainWindow(QMainWindow):
         self.run_button.setText("Generating...")
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Fetching data... %p%")
 
         self.thread = QThread()
         self.worker = DataFetcherWorker(state_fips, api_key)
@@ -214,6 +215,7 @@ class MainWindow(QMainWindow):
 
     def handle_data_fetched(self, census_df, shapefile_path):
         self.progress_bar.setValue(0)
+        self.progress_bar.setFormat("Redistricting... %p%")
         self.run_button.setText("Redistricting...")
 
         state_gdf = gpd.read_file(shapefile_path)
@@ -260,18 +262,21 @@ class MainWindow(QMainWindow):
         self.run_button.setEnabled(True)
         self.run_button.setText("Generate Map")
         self.progress_bar.setVisible(False)
+        self.progress_bar.setFormat("")
 
     def handle_redistricting_error(self, error_message):
         QMessageBox.critical(self, "Error", f"Failed to run redistricting: {error_message}")
         self.run_button.setEnabled(True)
         self.run_button.setText("Generate Map")
         self.progress_bar.setVisible(False)
+        self.progress_bar.setFormat("")
 
     def handle_data_fetch_error(self, error_message):
         QMessageBox.critical(self, "Error", f"Failed to fetch data: {error_message}")
         self.run_button.setEnabled(True)
         self.run_button.setText("Generate Map")
         self.progress_bar.setVisible(False)
+        self.progress_bar.setFormat("")
 
     def export_as_png(self):
         if self.map_generator:
