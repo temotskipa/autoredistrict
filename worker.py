@@ -66,7 +66,7 @@ class DataFetcherWorker(QObject):
             except requests.exceptions.RequestException as e:
                 print(f"An error occurred for county {county_fips}: {e}")
                 continue
-            time.sleep(0.2)
+            time.sleep(0.5)
 
         if not all_census_data:
             return None

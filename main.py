@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
 
         states = {
             "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas", "06": "California",
-            "08": "Colorado", "09": "Connecticut", "10": "Delaware", "11": "District of Columbia",
+            "08": "Colorado", "09": "Connecticut", "10": "Delaware",
             "12": "Florida", "13": "Georgia", "15": "Hawaii", "16": "Idaho", "17": "Illinois",
             "18": "Indiana", "19": "Iowa", "20": "Kansas", "21": "Kentucky", "22": "Louisiana",
             "23": "Maine", "24": "Maryland", "25": "Massachusetts", "26": "Michigan",
@@ -194,6 +194,10 @@ class MainWindow(QMainWindow):
             if state_fips in self.apportionment:
                 num_districts = self.apportionment[state_fips]
                 self.num_districts_spinbox.setValue(num_districts)
+                if num_districts == 1:
+                    self.run_button.setEnabled(False)
+                else:
+                    self.run_button.setEnabled(True)
 
     def run_redistricting(self):
         self._save_api_key()
