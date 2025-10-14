@@ -4,6 +4,7 @@ import pandas as pd
 from shapely.geometry import LineString
 import multiprocessing
 from functools import partial
+from PyQt5.QtCore import QObject, pyqtSignal
 
 def _polsby_popper_static(gdf):
     """
@@ -86,8 +87,11 @@ def _process_angle(angle, area_gdf, centroid, target_pop1, population_equality_w
     return score, {'part1': part1, 'part2': part2}
 
 
-class RedistrictingAlgorithm:
+class RedistrictingAlgorithm(QObject):
+    progress_update = pyqtSignal(int)
+
     def __init__(self, state_data, num_districts, population_equality_weight=1.0, compactness_weight=1.0, partisan_weight=0.0, vra_compliance=False, communities_of_interest=None, coi_weight=1.0):
+        super().__init__()
         self.state_data = state_data
         for col in ['P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N']:
             if col in self.state_data.columns:
@@ -101,11 +105,15 @@ class RedistrictingAlgorithm:
         self.coi_weight = coi_weight
 
     def divide_and_conquer(self):
+        self.partitions_done = 0
         districts = self._recursive_partition(self.state_data, self.num_districts)
         return districts
 
     def _recursive_partition(self, area_gdf, num_districts_to_create):
         if num_districts_to_create <= 1:
+            self.partitions_done += 1
+            progress = int((self.partitions_done / self.num_districts) * 100)
+            self.progress_update.emit(progress)
             return [area_gdf]
 
         num_districts_1 = num_districts_to_create // 2
@@ -155,6 +163,7 @@ class RedistrictingAlgorithm:
         return best_split
 
     def gerrymander(self):
+        self.partitions_done = 0
         self.partisan_weight = 1.0
         districts = self._recursive_partition(self.state_data, self.num_districts)
         return districts

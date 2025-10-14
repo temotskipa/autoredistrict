@@ -3,10 +3,14 @@ import zipfile
 import pandas as pd
 from PyQt5.QtCore import QObject, pyqtSignal
 from census import Census
+import requests
+from datetime import datetime
+import shutil
 
 class DataFetcherWorker(QObject):
     finished = pyqtSignal(pd.DataFrame, str)
     error = pyqtSignal(str)
+    progress = pyqtSignal(int)
 
     def __init__(self, state_fips, api_key):
         super().__init__()
@@ -43,6 +47,14 @@ class DataFetcherWorker(QObject):
             return None
 
     def _get_census_data(self, state_fips):
+        cache_dir = ".cache"
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_file = os.path.join(cache_dir, f"census_{state_fips}.csv")
+
+        if os.path.exists(cache_file):
+            print(f"Loading census data from cache: {cache_file}")
+            return pd.read_csv(cache_file, dtype={'GEOID': str})
+
         fields = ('NAME', 'P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N')
 
         counties = self._get_counties_for_state(state_fips)
@@ -50,7 +62,8 @@ class DataFetcherWorker(QObject):
             return None
 
         all_census_data = []
-        for county_fips in counties:
+        num_counties = len(counties)
+        for i, county_fips in enumerate(counties):
             tracts = self._get_tracts_for_county(state_fips, county_fips)
             if not tracts:
                 continue
@@ -61,27 +74,55 @@ class DataFetcherWorker(QObject):
                 except Exception as e:
                     print(f"An error occurred for tract {tract_fips} in county {county_fips}: {e}")
                     continue
+            self.progress.emit(int(((i + 1) / num_counties) * 75))
 
         if not all_census_data:
             return None
 
         df = pd.DataFrame(all_census_data)
         df['GEOID'] = df['state'] + df['county'] + df['tract'] + df['block']
+        df.to_csv(cache_file, index=False)
+        print(f"Saved census data to cache: {cache_file}")
         return df
 
     def _get_shapefiles(self, state_fips):
+        shapefile_dir = f"shapefiles_{state_fips}"
         base_url = "https://www2.census.gov/geo/tiger/TIGER2024/TABBLOCK20/"
         filename = f"tl_2024_{state_fips}_tabblock20.zip"
         url = f"{base_url}{filename}"
+
+        if os.path.exists(shapefile_dir):
+            try:
+                response = requests.head(url)
+                response.raise_for_status()
+                last_modified_header = response.headers.get('Last-Modified')
+                if last_modified_header:
+                    remote_last_modified = datetime.strptime(last_modified_header, '%a, %d %b %Y %H:%M:%S %Z')
+                    local_last_modified = datetime.fromtimestamp(os.path.getmtime(shapefile_dir))
+                    if remote_last_modified > local_last_modified:
+                        print("Remote shapefile is newer. Re-downloading...")
+                        shutil.rmtree(shapefile_dir)
+                    else:
+                        print(f"Using cached shapefile directory: {shapefile_dir}")
+                        self.progress.emit(100)
+                        return shapefile_dir
+            except requests.RequestException as e:
+                print(f"Could not check for newer shapefile, using cache. Error: {e}")
+                self.progress.emit(100)
+                return shapefile_dir
+
         try:
+            print(f"Downloading shapefile from {url}")
             response = self.c.session.get(url)
             response.raise_for_status()
             with open(filename, 'wb') as f:
                 f.write(response.content)
             with zipfile.ZipFile(filename, 'r') as zip_ref:
-                zip_ref.extractall(f"shapefiles_{state_fips}")
+                zip_ref.extractall(shapefile_dir)
             os.remove(filename)
-            return f"shapefiles_{state_fips}"
+            os.utime(shapefile_dir, None)
+            self.progress.emit(100)
+            return shapefile_dir
         except Exception as e:
             print(f"An error occurred while downloading the shapefile: {e}")
             return None
