@@ -9,6 +9,7 @@ This application allows users to automatically generate congressional district m
 -   **Customizable Criteria:** Adjust parameters like population equality and compactness.
 -   **VRA Compliance:** Enable or disable Voting Rights Act compliance.
 -   **Data Fetching:** Automatically fetches the latest census data and shapefiles.
+-   **Progress Feedback:** A progress bar provides real-time feedback during the map generation process.
 -   **Export Options:** Export the generated maps as PNG images or as shapefiles for use in GIS software.
 
 ## Setup and Installation

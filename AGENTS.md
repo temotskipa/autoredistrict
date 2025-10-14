@@ -9,10 +9,12 @@ This project is a congressional redistricting application that automatically gen
 ## Key Modules
 
 -   **`main.py`:** The main entry point of the application. It contains the `MainWindow` class, which defines the GUI and orchestrates the overall workflow.
--   **`data_fetcher.py`:** This module is responsible for fetching census data and shapefiles from the US Census Bureau.
+-   **`data_fetcher.py`:** This module is responsible for fetching the initial state population data for apportionment calculations.
 -   **`redistricting_algorithms.py`:** This module contains the implementation of the redistricting algorithms, including the "Divide and Conquer" algorithm and the gerrymandering algorithm.
 -   **`map_generator.py`:** This module is responsible for generating map images and exporting district data to shapefiles.
 -   **`apportionment.py`:** This module contains the logic for the Huntington-Hill apportionment method.
+-   **`worker.py`:** This module contains the `DataFetcherWorker` class, which runs the data fetching process in a separate `QThread` to prevent the GUI from freezing.
+-   **`redistricting_worker.py`:** This module contains the `RedistrictingWorker` class, which runs the redistricting algorithm in a separate `QThread`.
 
 ## Development Guidelines
 
@@ -29,6 +31,7 @@ This project is a congressional redistricting application that automatically gen
 -   **Support for Communities of Interest:** The application now supports the preservation of communities of interest by allowing users to upload a CSV file of GEOIDs.
 -   **Expanded State List:** The state selection dropdown is now populated with a complete list of US states.
 -   **Performance Optimization:** The redistricting algorithm has been parallelized to improve performance on multi-core systems.
+-   **Progress Bar:** A progress bar has been added to the GUI to provide feedback during the data fetching and redistricting processes.
 
 ## API Usage Notes
 
