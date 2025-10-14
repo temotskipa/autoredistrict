@@ -135,12 +135,15 @@ class RedistrictingAlgorithm(QObject):
         if total_population == 0: return None
         target_pop1 = (total_population / (num_districts_1 + num_districts_2)) * num_districts_1
 
-        centroid = area_gdf.unary_union.centroid
+        original_crs = area_gdf.crs
+        area_gdf_proj = area_gdf.to_crs(epsg=2163)
+
+        centroid = area_gdf_proj.unary_union.centroid
         angles = np.linspace(0, 180, 10)
 
         # Use functools.partial to create a function with most arguments already filled in
         worker_func = partial(_process_angle,
-                              area_gdf=area_gdf,
+                              area_gdf=area_gdf_proj,
                               centroid=centroid,
                               target_pop1=target_pop1,
                               population_equality_weight=self.population_equality_weight,
@@ -159,6 +162,10 @@ class RedistrictingAlgorithm(QObject):
             if score < best_score:
                 best_score = score
                 best_split = split
+
+        if best_split:
+            best_split['part1'] = best_split['part1'].to_crs(original_crs)
+            best_split['part2'] = best_split['part2'].to_crs(original_crs)
 
         return best_split
 

@@ -146,25 +146,12 @@ class MainWindow(QMainWindow):
 
     def clear_cache(self):
         cache_dir = ".cache"
-        shapefile_dirs = glob.glob("shapefiles_*")
-        deleted_something = False
-
         try:
             if os.path.exists(cache_dir):
                 shutil.rmtree(cache_dir)
-                print(f"Removed cache directory: {cache_dir}")
-                deleted_something = True
-
-            for d in shapefile_dirs:
-                shutil.rmtree(d)
-                print(f"Removed shapefile directory: {d}")
-                deleted_something = True
-
-            if deleted_something:
-                QMessageBox.information(self, "Cache Cleared", "The data cache has been cleared successfully.")
+                QMessageBox.information(self, "Cache Cleared", f"The cache directory ({cache_dir}) has been cleared successfully.")
             else:
-                QMessageBox.information(self, "Cache Cleared", "No cache files found to clear.")
-
+                QMessageBox.information(self, "Cache Cleared", "No cache directory found to clear.")
         except Exception as e:
             QMessageBox.critical(self, "Error", f"An error occurred while clearing the cache: {e}")
 
@@ -228,9 +215,22 @@ class MainWindow(QMainWindow):
         self._save_api_key()
         state_fips = self.state_combo.currentData()
         api_key = self.api_key_input.text()
+
+        # Disable UI controls
+        self.api_key_input.setEnabled(False)
+        self.house_size_spinbox.setEnabled(False)
+        self.calculate_apportionment_button.setEnabled(False)
+        self.state_combo.setEnabled(False)
+        self.vra_checkbox.setEnabled(False)
+        self.pop_equality_slider.setEnabled(False)
+        self.compactness_slider.setEnabled(False)
+        self.coi_upload_button.setEnabled(False)
+        self.algorithm_combo.setEnabled(False)
         self.run_button.setEnabled(False)
         self.export_png_button.setEnabled(False)
         self.export_shapefile_button.setEnabled(False)
+        self.clear_cache_button.setEnabled(False)
+
         self.run_button.setText("Generating...")
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
@@ -285,37 +285,47 @@ class MainWindow(QMainWindow):
 
         self.redistricting_thread.start()
 
+    def _re_enable_ui_controls(self):
+        """Re-enables all UI controls after processing is finished or an error occurs."""
+        self.api_key_input.setEnabled(True)
+        self.house_size_spinbox.setEnabled(True)
+        self.calculate_apportionment_button.setEnabled(True)
+        self.state_combo.setEnabled(True)
+        self.vra_checkbox.setEnabled(True)
+        self.pop_equality_slider.setEnabled(True)
+        self.compactness_slider.setEnabled(True)
+        self.coi_upload_button.setEnabled(True)
+        self.algorithm_combo.setEnabled(True)
+        self.run_button.setEnabled(True)
+        # Note: Export buttons are not re-enabled here as they depend on a generated map.
+        self.clear_cache_button.setEnabled(True)
+        self.run_button.setText("Generate Map")
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setFormat("")
+        self.update_num_districts() # Re-evaluates if run_button should be enabled
+
     def handle_redistricting_finished(self, districts_list):
         all_districts_gdf = gpd.GeoDataFrame()
         for i, district_gdf in enumerate(districts_list):
             district_gdf['district_id'] = i
-            all_districts_gdf = all_districts_gdf.append(district_gdf)
+            all_districts_gdf = pd.concat([all_districts_gdf, district_gdf])
 
         self.map_generator = MapGenerator(all_districts_gdf)
         map_image_path = self.map_generator.generate_map_image("temp_map.png")
         self.map_scene.clear()
         self.map_scene.addPixmap(QPixmap(map_image_path))
 
+        self._re_enable_ui_controls()
         self.export_png_button.setEnabled(True)
         self.export_shapefile_button.setEnabled(True)
-        self.run_button.setEnabled(True)
-        self.run_button.setText("Generate Map")
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFormat("")
 
     def handle_redistricting_error(self, error_message):
         QMessageBox.critical(self, "Error", f"Failed to run redistricting: {error_message}")
-        self.run_button.setEnabled(True)
-        self.run_button.setText("Generate Map")
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFormat("")
+        self._re_enable_ui_controls()
 
     def handle_data_fetch_error(self, error_message):
         QMessageBox.critical(self, "Error", f"Failed to fetch data: {error_message}")
-        self.run_button.setEnabled(True)
-        self.run_button.setText("Generate Map")
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setFormat("")
+        self._re_enable_ui_controls()
 
     def export_as_png(self):
         if self.map_generator:
