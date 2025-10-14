@@ -1,6 +1,9 @@
 import sys
 import json
 import us
+import shutil
+import glob
+import os
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit, QProgressBar
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
@@ -125,6 +128,11 @@ class MainWindow(QMainWindow):
         self.export_shapefile_button.clicked.connect(self.export_as_shapefile)
         controls_layout.addWidget(self.export_shapefile_button)
 
+        # Clear Cache button
+        self.clear_cache_button = QPushButton('Clear Cache')
+        self.clear_cache_button.clicked.connect(self.clear_cache)
+        controls_layout.addWidget(self.clear_cache_button)
+
         # Map display
         self.map_view = QGraphicsView()
         self.map_scene = QGraphicsScene()
@@ -135,6 +143,30 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(self.map_view)
 
         self._load_api_key()
+
+    def clear_cache(self):
+        cache_dir = ".cache"
+        shapefile_dirs = glob.glob("shapefiles_*")
+        deleted_something = False
+
+        try:
+            if os.path.exists(cache_dir):
+                shutil.rmtree(cache_dir)
+                print(f"Removed cache directory: {cache_dir}")
+                deleted_something = True
+
+            for d in shapefile_dirs:
+                shutil.rmtree(d)
+                print(f"Removed shapefile directory: {d}")
+                deleted_something = True
+
+            if deleted_something:
+                QMessageBox.information(self, "Cache Cleared", "The data cache has been cleared successfully.")
+            else:
+                QMessageBox.information(self, "Cache Cleared", "No cache files found to clear.")
+
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"An error occurred while clearing the cache: {e}")
 
     def _load_api_key(self):
         try:

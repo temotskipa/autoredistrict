@@ -3,6 +3,9 @@ import zipfile
 import pandas as pd
 from PyQt5.QtCore import QObject, pyqtSignal
 from census import Census
+import requests
+from datetime import datetime
+import shutil
 
 class DataFetcherWorker(QObject):
     finished = pyqtSignal(pd.DataFrame, str)
@@ -84,14 +87,30 @@ class DataFetcherWorker(QObject):
 
     def _get_shapefiles(self, state_fips):
         shapefile_dir = f"shapefiles_{state_fips}"
-        if os.path.exists(shapefile_dir):
-            print(f"Using cached shapefile directory: {shapefile_dir}")
-            self.progress.emit(100)
-            return shapefile_dir
-
         base_url = "https://www2.census.gov/geo/tiger/TIGER2024/TABBLOCK20/"
         filename = f"tl_2024_{state_fips}_tabblock20.zip"
         url = f"{base_url}{filename}"
+
+        if os.path.exists(shapefile_dir):
+            try:
+                response = requests.head(url)
+                response.raise_for_status()
+                last_modified_header = response.headers.get('Last-Modified')
+                if last_modified_header:
+                    remote_last_modified = datetime.strptime(last_modified_header, '%a, %d %b %Y %H:%M:%S %Z')
+                    local_last_modified = datetime.fromtimestamp(os.path.getmtime(shapefile_dir))
+                    if remote_last_modified > local_last_modified:
+                        print("Remote shapefile is newer. Re-downloading...")
+                        shutil.rmtree(shapefile_dir)
+                    else:
+                        print(f"Using cached shapefile directory: {shapefile_dir}")
+                        self.progress.emit(100)
+                        return shapefile_dir
+            except requests.RequestException as e:
+                print(f"Could not check for newer shapefile, using cache. Error: {e}")
+                self.progress.emit(100)
+                return shapefile_dir
+
         try:
             print(f"Downloading shapefile from {url}")
             response = self.c.session.get(url)
@@ -101,6 +120,7 @@ class DataFetcherWorker(QObject):
             with zipfile.ZipFile(filename, 'r') as zip_ref:
                 zip_ref.extractall(shapefile_dir)
             os.remove(filename)
+            os.utime(shapefile_dir, None)
             self.progress.emit(100)
             return shapefile_dir
         except Exception as e:
