@@ -289,7 +289,7 @@ class MainWindow(QMainWindow):
         all_districts_gdf = gpd.GeoDataFrame()
         for i, district_gdf in enumerate(districts_list):
             district_gdf['district_id'] = i
-            all_districts_gdf = all_districts_gdf.append(district_gdf)
+            all_districts_gdf = pd.concat([all_districts_gdf, district_gdf])
 
         self.map_generator = MapGenerator(all_districts_gdf)
         map_image_path = self.map_generator.generate_map_image("temp_map.png")
