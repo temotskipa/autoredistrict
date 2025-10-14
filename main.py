@@ -4,6 +4,7 @@ import us
 import shutil
 import glob
 import os
+import platform
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit, QProgressBar
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
@@ -76,6 +77,9 @@ class MainWindow(QMainWindow):
 
         # GPU acceleration
         self.gpu_checkbox = QCheckBox('Use GPU Acceleration')
+        if platform.system() == "Windows":
+            self.gpu_checkbox.setEnabled(False)
+            self.gpu_checkbox.setToolTip("GPU acceleration is not supported on native Windows. Please use WSL2 or Linux.")
         controls_layout.addWidget(self.gpu_checkbox)
 
         # Population equality weight
