@@ -1,6 +1,9 @@
 import os
 import zipfile
 import pandas as pd
+import cudf
+import geopandas as gpd
+from numba import cuda
 from PyQt5.QtCore import QObject, pyqtSignal
 from census import Census
 import requests
@@ -8,25 +11,46 @@ from datetime import datetime
 import shutil
 
 class DataFetcherWorker(QObject):
-    finished = pyqtSignal(pd.DataFrame, str)
+    finished = pyqtSignal(object)
     error = pyqtSignal(str)
     progress = pyqtSignal(int)
 
-    def __init__(self, state_fips, api_key):
+    def __init__(self, state_fips, api_key, use_gpu=False):
         super().__init__()
         self.state_fips = state_fips
         self.api_key = api_key
         self.c = Census(self.api_key)
+        self.use_gpu = use_gpu and cuda.is_available()
 
     def fetch_data(self):
         try:
-            census_df = self._get_census_data(self.state_fips)
             shapefile_path = self._get_shapefiles(self.state_fips)
+            if not shapefile_path:
+                self.error.emit("Failed to fetch shapefiles.")
+                return
 
-            if census_df is not None and shapefile_path:
-                self.finished.emit(census_df, shapefile_path)
+            if self.use_gpu:
+                census_df = self._get_census_data_gpu(self.state_fips)
+                if census_df is None:
+                    self.error.emit("Failed to fetch census data for GPU.")
+                    return
+
+                state_gdf = cuspatial.read_shapefile(shapefile_path)
+                state_gdf['GEOID'] = state_gdf['GEOID20']
+                merged_gdf = state_gdf.merge(census_df, on='GEOID')
+                self.finished.emit(merged_gdf)
+
             else:
-                self.error.emit("Failed to fetch data.")
+                census_df = self._get_census_data_cpu(self.state_fips)
+                if census_df is None:
+                    self.error.emit("Failed to fetch census data for CPU.")
+                    return
+
+                state_gdf = gpd.read_file(shapefile_path)
+                state_gdf['GEOID'] = state_gdf['GEOID20']
+                merged_gdf = state_gdf.merge(census_df, on='GEOID')
+                self.finished.emit(merged_gdf)
+
         except Exception as e:
             self.error.emit(str(e))
 
@@ -46,7 +70,7 @@ class DataFetcherWorker(QObject):
             print(f"An error occurred while fetching tracts for county {county_fips}: {e}")
             return None
 
-    def _get_census_data(self, state_fips):
+    def _get_census_data_cpu(self, state_fips):
         cache_dir = ".cache"
         os.makedirs(cache_dir, exist_ok=True)
         cache_file = os.path.join(cache_dir, f"census_{state_fips}.csv")
@@ -80,6 +104,45 @@ class DataFetcherWorker(QObject):
             return None
 
         df = pd.DataFrame(all_census_data)
+        df['GEOID'] = df['state'] + df['county'] + df['tract'] + df['block']
+        df.to_csv(cache_file, index=False)
+        print(f"Saved census data to cache: {cache_file}")
+        return df
+
+    def _get_census_data_gpu(self, state_fips):
+        cache_dir = ".cache"
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_file = os.path.join(cache_dir, f"census_{state_fips}.csv")
+
+        if os.path.exists(cache_file):
+            print(f"Loading census data from cache into GPU: {cache_file}")
+            return cudf.read_csv(cache_file, dtype={'GEOID': 'str'})
+
+        fields = ('NAME', 'P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N')
+
+        counties = self._get_counties_for_state(state_fips)
+        if not counties:
+            return None
+
+        all_census_data = []
+        num_counties = len(counties)
+        for i, county_fips in enumerate(counties):
+            tracts = self._get_tracts_for_county(state_fips, county_fips)
+            if not tracts:
+                continue
+            for tract_fips in tracts:
+                try:
+                    data = self.c.pl.get(fields, {'for': 'block:*', 'in': f'state:{state_fips} county:{county_fips} tract:{tract_fips}'})
+                    all_census_data.extend(data)
+                except Exception as e:
+                    print(f"An error occurred for tract {tract_fips} in county {county_fips}: {e}")
+                    continue
+            self.progress.emit(int(((i + 1) / num_counties) * 75))
+
+        if not all_census_data:
+            return None
+
+        df = cudf.DataFrame(all_census_data)
         df['GEOID'] = df['state'] + df['county'] + df['tract'] + df['block']
         df.to_csv(cache_file, index=False)
         print(f"Saved census data to cache: {cache_file}")

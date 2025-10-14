@@ -4,3 +4,10 @@ PyQt5
 requests
 census
 us
+numba
+dask
+
+--extra-index-url=https://pypi.nvidia.com
+cudf-cu13
+cuspatial-cu13
+dask-cudf-cu13

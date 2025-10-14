@@ -7,7 +7,7 @@ class RedistrictingWorker(QObject):
     progress = pyqtSignal(int)
     error = pyqtSignal(str)
 
-    def __init__(self, state_data, num_districts, algorithm_name, population_equality_weight, compactness_weight, vra_compliance, communities_of_interest):
+    def __init__(self, state_data, num_districts, algorithm_name, population_equality_weight, compactness_weight, vra_compliance, communities_of_interest, use_gpu=False):
         super().__init__()
         self.state_data = state_data
         self.num_districts = num_districts
@@ -16,6 +16,7 @@ class RedistrictingWorker(QObject):
         self.compactness_weight = compactness_weight
         self.vra_compliance = vra_compliance
         self.communities_of_interest = communities_of_interest
+        self.use_gpu = use_gpu
 
     def run(self):
         try:
@@ -25,7 +26,8 @@ class RedistrictingWorker(QObject):
                 population_equality_weight=self.population_equality_weight,
                 compactness_weight=self.compactness_weight,
                 vra_compliance=self.vra_compliance,
-                communities_of_interest=self.communities_of_interest
+                communities_of_interest=self.communities_of_interest,
+                use_gpu=self.use_gpu
             )
             algorithm.progress_update.connect(self.progress.emit)
 
