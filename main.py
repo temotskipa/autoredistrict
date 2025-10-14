@@ -1,5 +1,7 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider
+import json
+import us
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
@@ -28,6 +30,13 @@ class MainWindow(QMainWindow):
 
         # Controls layout
         controls_layout = QVBoxLayout()
+
+        # API Key
+        api_key_layout = QHBoxLayout()
+        api_key_layout.addWidget(QLabel('Census API Key:'))
+        self.api_key_input = QLineEdit()
+        api_key_layout.addWidget(self.api_key_input)
+        controls_layout.addLayout(api_key_layout)
 
         # House size
         house_size_layout = QHBoxLayout()
@@ -117,6 +126,23 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(controls_layout)
         main_layout.addWidget(self.map_view)
 
+        self._load_api_key()
+
+    def _load_api_key(self):
+        try:
+            with open('config.json', 'r') as f:
+                config = json.load(f)
+                api_key = config.get('api_key')
+                if api_key:
+                    self.api_key_input.setText(api_key)
+        except (FileNotFoundError, json.JSONDecodeError):
+            pass
+
+    def _save_api_key(self):
+        api_key = self.api_key_input.text()
+        with open('config.json', 'w') as f:
+            json.dump({'api_key': api_key}, f)
+
     def upload_coi_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Upload COI File", "", "CSV Files (*.csv)")
         if file_path:
@@ -124,7 +150,9 @@ class MainWindow(QMainWindow):
             self.coi_file_label.setText(file_path.split('/')[-1])
 
     def run_apportionment_calculation(self):
-        fetcher = DataFetcher()
+        self._save_api_key()
+        api_key = self.api_key_input.text()
+        fetcher = DataFetcher(api_key)
         state_populations = fetcher.get_all_states_population_data()
 
         if not state_populations:
@@ -137,27 +165,11 @@ class MainWindow(QMainWindow):
         # Populate the state dropdown
         self.state_combo.clear()
 
-        states = {
-            "01": "Alabama", "02": "Alaska", "04": "Arizona", "05": "Arkansas", "06": "California",
-            "08": "Colorado", "09": "Connecticut", "10": "Delaware", "11": "District of Columbia",
-            "12": "Florida", "13": "Georgia", "15": "Hawaii", "16": "Idaho", "17": "Illinois",
-            "18": "Indiana", "19": "Iowa", "20": "Kansas", "21": "Kentucky", "22": "Louisiana",
-            "23": "Maine", "24": "Maryland", "25": "Massachusetts", "26": "Michigan",
-            "27": "Minnesota", "28": "Mississippi", "29": "Missouri", "30": "Montana",
-            "31": "Nebraska", "32": "Nevada", "33": "New Hampshire", "34": "New Jersey",
-            "35": "New Mexico", "36": "New York", "37": "North Carolina", "38": "North Dakota",
-            "39": "Ohio", "40": "Oklahoma", "41": "Oregon", "42": "Pennsylvania",
-            "44": "Rhode Island", "45": "South Carolina", "46": "South Dakota", "47": "Tennessee",
-            "48": "Texas", "49": "Utah", "50": "Vermont", "51": "Virginia", "53": "Washington",
-            "54": "West Virginia", "55": "Wisconsin", "56": "Wyoming"
-        }
-
-        for fips, name in states.items():
-            if fips in self.apportionment:
-                self.state_combo.addItem(name, userData=fips)
+        for state in us.states.STATES:
+            if state.fips in self.apportionment:
+                self.state_combo.addItem(state.name, userData=state.fips)
 
         self.state_combo.setEnabled(True)
-        self.run_button.setEnabled(True)
         self.update_num_districts()
 
     def update_num_districts(self):
@@ -166,14 +178,20 @@ class MainWindow(QMainWindow):
             if state_fips in self.apportionment:
                 num_districts = self.apportionment[state_fips]
                 self.num_districts_spinbox.setValue(num_districts)
+                if num_districts == 1:
+                    self.run_button.setEnabled(False)
+                else:
+                    self.run_button.setEnabled(True)
 
     def run_redistricting(self):
+        self._save_api_key()
         state_fips = self.state_combo.currentData()
+        api_key = self.api_key_input.text()
         self.run_button.setEnabled(False)
         self.run_button.setText("Generating...")
 
         self.thread = QThread()
-        self.worker = DataFetcherWorker(state_fips)
+        self.worker = DataFetcherWorker(state_fips, api_key)
         self.worker.moveToThread(self.thread)
 
         self.thread.started.connect(self.worker.fetch_data)
