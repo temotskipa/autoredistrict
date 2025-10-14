@@ -7,6 +7,7 @@ from census import Census
 class DataFetcherWorker(QObject):
     finished = pyqtSignal(pd.DataFrame, str)
     error = pyqtSignal(str)
+    progress = pyqtSignal(int)
 
     def __init__(self, state_fips, api_key):
         super().__init__()
@@ -50,7 +51,8 @@ class DataFetcherWorker(QObject):
             return None
 
         all_census_data = []
-        for county_fips in counties:
+        num_counties = len(counties)
+        for i, county_fips in enumerate(counties):
             tracts = self._get_tracts_for_county(state_fips, county_fips)
             if not tracts:
                 continue
@@ -61,6 +63,7 @@ class DataFetcherWorker(QObject):
                 except Exception as e:
                     print(f"An error occurred for tract {tract_fips} in county {county_fips}: {e}")
                     continue
+            self.progress.emit(int(((i + 1) / num_counties) * 75))
 
         if not all_census_data:
             return None
@@ -81,6 +84,7 @@ class DataFetcherWorker(QObject):
             with zipfile.ZipFile(filename, 'r') as zip_ref:
                 zip_ref.extractall(f"shapefiles_{state_fips}")
             os.remove(filename)
+            self.progress.emit(100)
             return f"shapefiles_{state_fips}"
         except Exception as e:
             print(f"An error occurred while downloading the shapefile: {e}")

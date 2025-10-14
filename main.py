@@ -1,7 +1,7 @@
 import sys
 import json
 import us
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit, QProgressBar
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
@@ -13,6 +13,7 @@ from data_fetcher import DataFetcher
 from redistricting_algorithms import RedistrictingAlgorithm
 from apportionment import calculate_apportionment
 from worker import DataFetcherWorker
+from redistricting_worker import RedistrictingWorker
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -108,6 +109,11 @@ class MainWindow(QMainWindow):
         self.run_button.clicked.connect(self.run_redistricting)
         controls_layout.addWidget(self.run_button)
 
+        # Progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        controls_layout.addWidget(self.progress_bar)
+
         # Export buttons
         self.export_png_button = QPushButton('Export as PNG')
         self.export_png_button.clicked.connect(self.export_as_png)
@@ -189,6 +195,8 @@ class MainWindow(QMainWindow):
         api_key = self.api_key_input.text()
         self.run_button.setEnabled(False)
         self.run_button.setText("Generating...")
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
 
         self.thread = QThread()
         self.worker = DataFetcherWorker(state_fips, api_key)
@@ -197,6 +205,7 @@ class MainWindow(QMainWindow):
         self.thread.started.connect(self.worker.fetch_data)
         self.worker.finished.connect(self.handle_data_fetched)
         self.worker.error.connect(self.handle_data_fetch_error)
+        self.worker.progress.connect(self.progress_bar.setValue)
         self.worker.finished.connect(self.thread.quit)
         self.worker.finished.connect(self.worker.deleteLater)
         self.thread.finished.connect(self.thread.deleteLater)
@@ -204,10 +213,8 @@ class MainWindow(QMainWindow):
         self.thread.start()
 
     def handle_data_fetched(self, census_df, shapefile_path):
-        state_fips = self.state_combo.currentData()
-        num_districts = self.num_districts_spinbox.value()
-        vra_compliance = self.vra_checkbox.isChecked()
-        algorithm_name = self.algorithm_combo.currentText()
+        self.progress_bar.setValue(0)
+        self.run_button.setText("Redistricting...")
 
         state_gdf = gpd.read_file(shapefile_path)
         state_gdf['GEOID'] = state_gdf['GEOID20']
@@ -216,25 +223,30 @@ class MainWindow(QMainWindow):
         np.random.seed(0)
         merged_gdf['party'] = np.random.rand(len(merged_gdf))
 
-        pop_equality_weight = self.pop_equality_slider.value() / 100.0
-        compactness_weight = self.compactness_slider.value() / 100.0
+        self.redistricting_thread = QThread()
+        self.redistricting_worker = RedistrictingWorker(
+            state_data=merged_gdf,
+            num_districts=self.num_districts_spinbox.value(),
+            algorithm_name=self.algorithm_combo.currentText(),
+            population_equality_weight=self.pop_equality_slider.value() / 100.0,
+            compactness_weight=self.compactness_slider.value() / 100.0,
+            vra_compliance=self.vra_checkbox.isChecked(),
+            communities_of_interest=self.coi_file_path
+        )
+        self.redistricting_worker.moveToThread(self.redistricting_thread)
 
-        coi_data = None
-        if self.coi_file_path:
-            coi_df = pd.read_csv(self.coi_file_path)
-            coi_data = list(coi_df['GEOID'])
+        self.redistricting_thread.started.connect(self.redistricting_worker.run)
+        self.redistricting_worker.finished.connect(self.handle_redistricting_finished)
+        self.redistricting_worker.error.connect(self.handle_redistricting_error)
+        self.redistricting_worker.progress.connect(self.progress_bar.setValue)
 
-        algorithm = RedistrictingAlgorithm(merged_gdf, num_districts,
-                                           population_equality_weight=pop_equality_weight,
-                                           compactness_weight=compactness_weight,
-                                           vra_compliance=vra_compliance,
-                                           communities_of_interest=coi_data)
+        self.redistricting_worker.finished.connect(self.redistricting_thread.quit)
+        self.redistricting_worker.finished.connect(self.redistricting_worker.deleteLater)
+        self.redistricting_thread.finished.connect(self.redistricting_thread.deleteLater)
 
-        if "Divide and Conquer" in algorithm_name:
-            districts_list = algorithm.divide_and_conquer()
-        else:
-            districts_list = algorithm.gerrymander()
+        self.redistricting_thread.start()
 
+    def handle_redistricting_finished(self, districts_list):
         all_districts_gdf = gpd.GeoDataFrame()
         for i, district_gdf in enumerate(districts_list):
             district_gdf['district_id'] = i
@@ -247,11 +259,19 @@ class MainWindow(QMainWindow):
 
         self.run_button.setEnabled(True)
         self.run_button.setText("Generate Map")
+        self.progress_bar.setVisible(False)
+
+    def handle_redistricting_error(self, error_message):
+        QMessageBox.critical(self, "Error", f"Failed to run redistricting: {error_message}")
+        self.run_button.setEnabled(True)
+        self.run_button.setText("Generate Map")
+        self.progress_bar.setVisible(False)
 
     def handle_data_fetch_error(self, error_message):
         QMessageBox.critical(self, "Error", f"Failed to fetch data: {error_message}")
         self.run_button.setEnabled(True)
         self.run_button.setText("Generate Map")
+        self.progress_bar.setVisible(False)
 
     def export_as_png(self):
         if self.map_generator:
