@@ -2,3 +2,4 @@ geopandas
 matplotlib
 PyQt5
 requests
+census
