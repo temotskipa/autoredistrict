@@ -29,3 +29,7 @@ This project is a congressional redistricting application that automatically gen
 -   **Support for Communities of Interest:** The application now supports the preservation of communities of interest by allowing users to upload a CSV file of GEOIDs.
 -   **Expanded State List:** The state selection dropdown is now populated with a complete list of US states.
 -   **Performance Optimization:** The redistricting algorithm has been parallelized to improve performance on multi-core systems.
+
+## API Usage Notes
+
+-   **Census API for Block-Level Data:** When fetching block-level data from the Census API, it is required to specify both the state and county FIPS codes. A request for all blocks within a state will not work without also specifying a county.
