@@ -1,4 +1,5 @@
 import sys
+import json
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit
 from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
@@ -124,6 +125,24 @@ class MainWindow(QMainWindow):
         main_layout.addLayout(controls_layout)
         main_layout.addWidget(self.map_view)
 
+        self._load_api_key()
+
+    def _load_api_key(self):
+        try:
+            with open('config.json', 'r') as f:
+                config = json.load(f)
+                api_key = config.get('api_key')
+                if api_key:
+                    self.api_key_input.setText(api_key)
+        except (FileNotFoundError, json.JSONDecodeError):
+            # It's okay if the file doesn't exist or is malformed.
+            pass
+
+    def _save_api_key(self):
+        api_key = self.api_key_input.text()
+        with open('config.json', 'w') as f:
+            json.dump({'api_key': api_key}, f)
+
     def upload_coi_file(self):
         file_path, _ = QFileDialog.getOpenFileName(self, "Upload COI File", "", "CSV Files (*.csv)")
         if file_path:
@@ -131,6 +150,7 @@ class MainWindow(QMainWindow):
             self.coi_file_label.setText(file_path.split('/')[-1])
 
     def run_apportionment_calculation(self):
+        self._save_api_key()
         api_key = self.api_key_input.text()
         fetcher = DataFetcher(api_key)
         state_populations = fetcher.get_all_states_population_data()
@@ -176,6 +196,7 @@ class MainWindow(QMainWindow):
                 self.num_districts_spinbox.setValue(num_districts)
 
     def run_redistricting(self):
+        self._save_api_key()
         state_fips = self.state_combo.currentData()
         api_key = self.api_key_input.text()
         self.run_button.setEnabled(False)

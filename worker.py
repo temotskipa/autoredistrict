@@ -42,7 +42,7 @@ class DataFetcherWorker(QObject):
 
     def _get_census_data(self, state_fips):
         base_url = "https://api.census.gov/data/2020/dec/pl"
-        get_vars = "NAME,P1_001N,P1_003N,P1_004N,P1_005N,P1_006N,P1_007N,P1_008N"
+        get_vars = "NAME,P1_001N,P1_003N,P1_004N,P1_005N,P1_006N,P1_007N,P1_008N,state,county,tract,block"
 
         counties = self._get_counties_for_state(state_fips)
         if not counties:
