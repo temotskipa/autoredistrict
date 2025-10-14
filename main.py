@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
         self.num_districts_spinbox = QSpinBox()
         self.num_districts_spinbox.setMinimum(1)
         self.num_districts_spinbox.setValue(1)
-        self.num_districts_spinbox.setReadOnly(True)
+        self.num_districts_spinbox.setEnabled(False)
         controls_layout.addWidget(self.num_districts_spinbox)
 
         # VRA compliance
@@ -116,10 +116,12 @@ class MainWindow(QMainWindow):
 
         # Export buttons
         self.export_png_button = QPushButton('Export as PNG')
+        self.export_png_button.setEnabled(False)
         self.export_png_button.clicked.connect(self.export_as_png)
         controls_layout.addWidget(self.export_png_button)
 
         self.export_shapefile_button = QPushButton('Export as Shapefile')
+        self.export_shapefile_button.setEnabled(False)
         self.export_shapefile_button.clicked.connect(self.export_as_shapefile)
         controls_layout.addWidget(self.export_shapefile_button)
 
@@ -179,6 +181,7 @@ class MainWindow(QMainWindow):
         self.update_num_districts()
 
     def update_num_districts(self):
+        self.num_districts_spinbox.setEnabled(True)
         if self.apportionment:
             state_fips = self.state_combo.currentData()
             if state_fips in self.apportionment:
@@ -194,6 +197,8 @@ class MainWindow(QMainWindow):
         state_fips = self.state_combo.currentData()
         api_key = self.api_key_input.text()
         self.run_button.setEnabled(False)
+        self.export_png_button.setEnabled(False)
+        self.export_shapefile_button.setEnabled(False)
         self.run_button.setText("Generating...")
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
@@ -259,6 +264,8 @@ class MainWindow(QMainWindow):
         self.map_scene.clear()
         self.map_scene.addPixmap(QPixmap(map_image_path))
 
+        self.export_png_button.setEnabled(True)
+        self.export_shapefile_button.setEnabled(True)
         self.run_button.setEnabled(True)
         self.run_button.setText("Generate Map")
         self.progress_bar.setVisible(False)
