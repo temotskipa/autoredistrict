@@ -1,6 +1,6 @@
 import sys
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QThread
 from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 import geopandas as gpd
@@ -10,6 +10,7 @@ from map_generator import MapGenerator
 from data_fetcher import DataFetcher
 from redistricting_algorithms import RedistrictingAlgorithm
 from apportionment import calculate_apportionment
+from worker import DataFetcherWorker
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -167,44 +168,44 @@ class MainWindow(QMainWindow):
                 self.num_districts_spinbox.setValue(num_districts)
 
     def run_redistricting(self):
-        # Get parameters from the GUI
+        state_fips = self.state_combo.currentData()
+        self.run_button.setEnabled(False)
+        self.run_button.setText("Generating...")
+
+        self.thread = QThread()
+        self.worker = DataFetcherWorker(state_fips)
+        self.worker.moveToThread(self.thread)
+
+        self.thread.started.connect(self.worker.fetch_data)
+        self.worker.finished.connect(self.handle_data_fetched)
+        self.worker.error.connect(self.handle_data_fetch_error)
+        self.worker.finished.connect(self.thread.quit)
+        self.worker.finished.connect(self.worker.deleteLater)
+        self.thread.finished.connect(self.thread.deleteLater)
+
+        self.thread.start()
+
+    def handle_data_fetched(self, census_df, shapefile_path):
         state_fips = self.state_combo.currentData()
         num_districts = self.num_districts_spinbox.value()
         vra_compliance = self.vra_checkbox.isChecked()
         algorithm_name = self.algorithm_combo.currentText()
 
-        # Fetch the data
-        fetcher = DataFetcher()
-        census_data = fetcher.get_census_data(state_fips)
-        shapefile_path = fetcher.get_shapefiles(state_fips)
-
-        if not census_data or not shapefile_path:
-            QMessageBox.critical(self, "Error", "Failed to fetch data. Please check the console for details.")
-            return
-
-        # Load the shapefile and census data
         state_gdf = gpd.read_file(shapefile_path)
-        census_df = pd.DataFrame(census_data[1:], columns=census_data[0])
-
-        # Merge the data
         state_gdf['GEOID'] = state_gdf['GEOID20']
         merged_gdf = state_gdf.merge(census_df, on='GEOID')
 
-        # Add placeholder party data for gerrymandering demonstration
         np.random.seed(0)
         merged_gdf['party'] = np.random.rand(len(merged_gdf))
 
-        # Get weights from sliders
         pop_equality_weight = self.pop_equality_slider.value() / 100.0
         compactness_weight = self.compactness_slider.value() / 100.0
 
-        # Load COI data if a file has been uploaded
         coi_data = None
         if self.coi_file_path:
             coi_df = pd.read_csv(self.coi_file_path)
             coi_data = list(coi_df['GEOID'])
 
-        # Run the selected algorithm
         algorithm = RedistrictingAlgorithm(merged_gdf, num_districts,
                                            population_equality_weight=pop_equality_weight,
                                            compactness_weight=compactness_weight,
@@ -216,17 +217,23 @@ class MainWindow(QMainWindow):
         else:
             districts_list = algorithm.gerrymander()
 
-        # Combine the districts into a single GeoDataFrame for visualization
         all_districts_gdf = gpd.GeoDataFrame()
         for i, district_gdf in enumerate(districts_list):
             district_gdf['district_id'] = i
             all_districts_gdf = all_districts_gdf.append(district_gdf)
 
-        # Generate and display the map
         self.map_generator = MapGenerator(all_districts_gdf)
         map_image_path = self.map_generator.generate_map_image("temp_map.png")
         self.map_scene.clear()
         self.map_scene.addPixmap(QPixmap(map_image_path))
+
+        self.run_button.setEnabled(True)
+        self.run_button.setText("Generate Map")
+
+    def handle_data_fetch_error(self, error_message):
+        QMessageBox.critical(self, "Error", f"Failed to fetch data: {error_message}")
+        self.run_button.setEnabled(True)
+        self.run_button.setText("Generate Map")
 
     def export_as_png(self):
         if self.map_generator:
@@ -241,7 +248,6 @@ class MainWindow(QMainWindow):
             if file_path:
                 self.map_generator.export_to_shapefile(file_path)
                 print(f"Districts saved to {file_path}")
-
 
 def main():
     app = QApplication(sys.argv)
