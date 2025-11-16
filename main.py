@@ -1,4 +1,4 @@
-from autoredistrict.app import main
+from src.autoredistrict.app import main
 
 if __name__ == "__main__":
     main()
