@@ -1,0 +1,18 @@
+- state: GA
+  contest: Governor
+  year: 2022
+  granularity: county
+  confidence: High
+  url: https://raw.githubusercontent.com/openelections/openelections-data-ga/master/2022/20221108__ga__general__precinct.csv
+  format: csv
+  provider_key: ga_governor_2022
+  description: Official 2022 Georgia governor precinct results aggregated to counties.
+  parser: precinct_csv
+  county_field: county
+  party_field: party
+  vote_fields: [election_day_votes, advanced_votes, absentee_by_mail_votes, provisional_votes]
+  dem_token: DEM
+  gop_token: REP
+  granularity_rank: 1
+  base_priority: 40
+  recency_note: Certified 2022 statewide general election

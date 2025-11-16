@@ -16,3 +16,5 @@ temp_map.png
 *.zip
 shapefiles_*/
 config.json
+.cache
+.python-version

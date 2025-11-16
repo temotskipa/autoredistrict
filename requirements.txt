@@ -1,6 +1,10 @@
+census
 geopandas
 matplotlib
+numpy
+pandas
 PyQt5
 requests
-census
+shapely
 us
+pydataverse
