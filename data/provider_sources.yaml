@@ -10,7 +10,11 @@
   parser: precinct_csv
   county_field: county
   party_field: party
-  vote_fields: [election_day_votes, advanced_votes, absentee_by_mail_votes, provisional_votes]
+  vote_fields:
+  - election_day_votes
+  - advanced_votes
+  - absentee_by_mail_votes
+  - provisional_votes
   dem_token: DEM
   gop_token: REP
   granularity_rank: 1

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate provider metadata entries by probing known data sources."""
+import csv
 import hashlib
 import json
 import os
@@ -15,10 +16,13 @@ METADATA_PATH = ROOT / "data" / "provider_sources.yaml"
 CACHE_DIR = ROOT / ".cache" / "provider_probe"
 CACHE_DIR.mkdir(parents=True, exist_ok=True)
 
-OPEN_ELECTIONS_REPOS = [
-    ("openelections", "openelections-data-ga"),
-    ("openelections", "openelections-data-va"),
-]
+ORG = "openelections"
+TARGET_YEARS = [2022]
+
+SESSION = requests.Session()
+TOKEN = os.getenv("GITHUB_TOKEN")
+if TOKEN:
+    SESSION.headers.update({"Authorization": f"Bearer {TOKEN}"})
 def load_metadata() -> List[Dict]:
     if not METADATA_PATH.exists():
         return []
@@ -29,91 +33,146 @@ def load_metadata() -> List[Dict]:
 def save_metadata(data: List[Dict]):
     with open(METADATA_PATH, "w") as fp:
         yaml.safe_dump(data, fp, sort_keys=False)
-def validate_source(url: str) -> bool:
+def download_metadata(url: str):
     try:
-        resp = requests.get(url, stream=True, timeout=15)
+        resp = requests.get(url, timeout=30)
         resp.raise_for_status()
-        size = 0
-        for chunk in resp.iter_content(1024 * 1024):
-            if not chunk:
-                break
-            size += len(chunk)
-            if size > 1024 * 1024:
-                break
-        return size > 0
     except requests.RequestException:
-        return False
+        return None
+    data = resp.content
+    hasher = hashlib.sha256(data)
+    size = len(data)
+    text = data.decode("utf-8", errors="ignore")
+    reader = csv.reader(text.splitlines())
+    try:
+        header = next(reader)
+    except StopIteration:
+        return None
+    header_lower = [h.strip().lower() for h in header]
+    county_field = None
+    for candidate in ("county", "county_name", "county_label"):
+        if candidate in header_lower:
+            county_field = header[header_lower.index(candidate)]
+            break
+    if not county_field:
+        return None
+    party_field = None
+    for candidate in ("party", "party_simplified", "party_detailed"):
+        if candidate in header_lower:
+            party_field = header[header_lower.index(candidate)]
+            break
+    if not party_field:
+        return None
+    vote_fields = []
+    if "votes" in header_lower:
+        vote_fields = [header[header_lower.index("votes")]]
+    else:
+        vote_fields = [col for col in header if col.lower().endswith("_votes")]
+    if not vote_fields:
+        return None
+    return {
+        "file_hash": hasher.hexdigest(),
+        "file_size": size,
+        "county_field": county_field,
+        "party_field": party_field,
+        "vote_fields": vote_fields,
+    }
+
+
+def list_repos(session):
+    url = f"https://api.github.com/orgs/{ORG}/repos?per_page=100"
+    while url:
+        resp = session.get(url, timeout=15)
+        if resp.status_code == 403:
+            raise RuntimeError("GitHub rate limit exceeded. Set GITHUB_TOKEN.")
+        resp.raise_for_status()
+        data = resp.json()
+        for repo in data:
+            name = repo.get("name", "")
+            if not name.startswith("openelections-data-"):
+                continue
+            suffix = name.rsplit("-", 1)[-1]
+            if len(suffix) != 2:
+                continue
+            yield repo["owner"]["login"], name, suffix.upper()
+        url = resp.links.get("next", {}).get("url")
 
 
 def discover_openelections() -> List[Dict]:
     entries = []
-    session = requests.Session()
-    for owner, repo in OPEN_ELECTIONS_REPOS:
-        api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/2022"
-        try:
-            resp = session.get(api_url, timeout=15)
-            resp.raise_for_status()
-        except requests.RequestException:
-            continue
-        for item in resp.json():
-            name = item.get("name", "")
-            if not name.endswith(".csv"):
+    repo_list = list(list_repos(SESSION))
+    for owner, repo, state_abbr in repo_list:
+        for year in TARGET_YEARS:
+            api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{year}"
+            try:
+                resp = SESSION.get(api_url, timeout=15)
+                if resp.status_code == 404:
+                    continue
+                if resp.status_code == 403:
+                    raise RuntimeError("GitHub rate limit exceeded. Set GITHUB_TOKEN.")
+                resp.raise_for_status()
+            except requests.RequestException:
                 continue
-            match = re.match(r"(\\d{8})__([a-z]{2})__([a-z_]+)__([a-z_]+).csv", name)
-            if not match:
-                continue
-            date, state, contest_type, granularity = match.groups()
-            year = int(date[:4])
-            state_abbr = state.upper()
-            url = item.get("download_url")
-            entries.append({
-                "state": state_abbr,
-                "contest": contest_type.replace("_", " ").title(),
-                "year": year,
-                "granularity": "county" if "precinct" in granularity else granularity,
-                "confidence": "High",
-                "url": url,
-                "format": "csv",
-                "parser": "precinct_csv" if "precinct" in granularity else "county_csv",
-                "county_field": "county",
-                "party_field": "party",
-                "vote_fields": ["votes"] if "precinct" not in granularity else [
-                    "election_day_votes", "advanced_votes", "absentee_by_mail_votes", "provisional_votes"
-                ],
-                "dem_token": "DEM",
-                "gop_token": "REP",
-            })
+            for item in resp.json():
+                name = item.get("name", "")
+                if not name.endswith(".csv"):
+                    continue
+                match = re.match(r"(\\d{8})__([a-z]{2})__([a-z0-9_]+)__([a-z0-9_]+)\.csv", name)
+                if not match:
+                    continue
+                _, state, contest_type, granularity = match.groups()
+                if state.upper() != state_abbr:
+                    continue
+                url = item.get("download_url")
+                entry = {
+                    "state": state_abbr,
+                    "contest": contest_type.replace("_", " ").title(),
+                    "year": year,
+                    "granularity": "precinct" if granularity == "precinct" else granularity,
+                    "confidence": "Medium",
+                    "url": url,
+                    "format": "csv",
+                    "parser": "precinct_csv" if granularity == "precinct" else "county_csv",
+                    "dem_token": "DEM",
+                    "gop_token": "REP",
+                }
+                entries.append(entry)
     return entries
 
 
 def main():
     existing = load_metadata()
-    existing_keys = {(item["state"], item["contest"], item.get("year")) for item in existing}
+    lookup = {(item["state"], item["contest"], item.get("year")): item for item in existing}
 
     discovered = discover_openelections()
-    new_entries = []
+    added = 0
     for src in discovered:
         key = (src["state"], src["contest"], src.get("year"))
-        if key in existing_keys:
-            continue
-        if not validate_source(src["url"]):
+        metadata = download_metadata(src["url"])
+        if not metadata:
             continue
         entry = {
             **src,
+            **metadata,
             "provider_key": f"{src['state'].lower()}_{src['contest'].lower().replace(' ', '_')}_{src.get('year', '')}",
-            "granularity_rank": 1 if src.get("granularity") == "county" else 2,
+            "granularity_rank": 1,
             "base_priority": 60,
             "recency_note": f"Certified {src.get('year')} contest",
         }
-        new_entries.append(entry)
+        if key in lookup:
+            lookup[key].update(entry)
+        else:
+            lookup[key] = entry
+            added += 1
 
-    if not new_entries:
+    if not added:
         print("No new entries discovered.")
+        save_metadata(list(lookup.values()))
         return
 
-    combined = existing + new_entries
+    combined = sorted(lookup.values(), key=lambda x: (x["state"], x.get("year", 0), x["contest"]))
     save_metadata(combined)
-    print(f"Added {len(new_entries)} entries to {METADATA_PATH}")
+    print(f"Added {added} entries to {METADATA_PATH}")
 
 
 if __name__ == "__main__":
