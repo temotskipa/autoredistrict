@@ -9,7 +9,7 @@ import requests
 import us
 import yaml
 
-from autoredistrict.data.partisan_data import CountyPresidentialReturnsProvider
+from .partisan_data import CountyPresidentialReturnsProvider
 
 
 AVAILABLE_PARTISAN_YEARS = [2000, 2004, 2008, 2012, 2016, 2020, 2024]
@@ -427,6 +427,13 @@ def fetch_scores_for_provider(meta: ProviderMetadata, state_fips: str, election_
     if not fetcher:
         return None
     return fetcher(state_fips, election_year if meta.supports_year_selection else None)
+
+
+def allocate_partisan_to_geoid(base_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Placeholder kept for API compatibility; block/tract allocation handled in DataFetcherWorker.
+    """
+    return base_df
 
 
 def _load_metadata_providers():

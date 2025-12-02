@@ -34,3 +34,25 @@ python main.py
 ```
 
 This will open the main application window, where you can select a state, choose an algorithm, and generate a district map.
+
+### Headless CLI (no GUI required)
+
+For quick smoke tests or server use, run the CLI:
+```bash
+python -m src.autoredistrict.cli <state> --api-key $CENSUS_API_KEY --map-out map.png --shp-out districts.shp
+```
+
+To exercise the pipeline without network/API keys, use the synthetic demo dataset:
+```bash
+python -m src.autoredistrict.cli demo --demo --districts 4 --map-out demo.png
+```
+
+For faster but lower-fidelity runs, use tract resolution:
+```bash
+python -m src.autoredistrict.cli "North Carolina" --api-key $CENSUS_API_KEY --resolution tract
+```
+
+To prefetch and cache data/shapefiles only (no map generation):
+```bash
+python -m src.autoredistrict.cli "North Carolina" --api-key $CENSUS_API_KEY --cache-only
+```

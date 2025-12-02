@@ -4,7 +4,16 @@ import pandas as pd
 from shapely.geometry import LineString
 import multiprocessing
 from functools import partial
-from PyQt5.QtCore import QObject, pyqtSignal
+
+
+class Signal:
+    def __init__(self):
+        self._subs = []
+    def connect(self, fn):
+        self._subs.append(fn)
+    def emit(self, value):
+        for fn in self._subs:
+            fn(value)
 
 
 def _weighted_partisan_share(gdf):
@@ -100,8 +109,8 @@ def _process_angle(angle, area_gdf, centroid, target_pop1, population_equality_w
     return score, {'part1': part1, 'part2': part2}
 
 
-class RedistrictingAlgorithm(QObject):
-    progress_update = pyqtSignal(int)
+class RedistrictingAlgorithm:
+    progress_update = Signal()
 
     def __init__(self, state_data, num_districts, population_equality_weight=1.0, compactness_weight=1.0, partisan_weight=0.0, vra_compliance=False, communities_of_interest=None, coi_weight=1.0):
         super().__init__()

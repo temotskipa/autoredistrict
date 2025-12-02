@@ -2,7 +2,6 @@ import sys
 import json
 import us
 import shutil
-import glob
 import os
 from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit, QProgressBar, QGroupBox
 from PyQt5.QtCore import Qt, QThread
@@ -10,17 +9,17 @@ from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QFileDialog, QMessageBox
 import geopandas as gpd
 import pandas as pd
-from autoredistrict.rendering.map_generator import MapGenerator
-from autoredistrict.data.data_fetcher import DataFetcher
-from autoredistrict.core.redistricting_algorithms import RedistrictingAlgorithm
-from autoredistrict.core.apportionment import calculate_apportionment
-from autoredistrict.workers.data_worker import DataFetcherWorker
-from autoredistrict.data.partisan_providers import (
+from .rendering.map_generator import MapGenerator
+from .data.data_fetcher import DataFetcher
+from .core.redistricting_algorithms import RedistrictingAlgorithm
+from .core.apportionment import calculate_apportionment
+from .workers.data_worker import DataFetcherWorker
+from .data.partisan_providers import (
     AVAILABLE_PARTISAN_YEARS,
     provider_chain_for_state,
     available_manual_providers,
 )
-from autoredistrict.workers.redistricting_worker import RedistrictingWorker
+from .workers.redistricting_worker import RedistrictingWorker
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -167,6 +166,11 @@ class MainWindow(QMainWindow):
         self.progress_bar.setVisible(False)
         controls_layout.addWidget(self.progress_bar)
 
+        # Fast mode (tract-level) toggle
+        self.fast_mode_checkbox = QCheckBox('Fast mode (tract-level data)')
+        self.fast_mode_checkbox.setToolTip('Use tract-level Census + tract shapefiles for faster runs (lower resolution).')
+        controls_layout.addWidget(self.fast_mode_checkbox)
+
         # Export buttons
         self.export_png_button = QPushButton('Export as PNG')
         self.export_png_button.setEnabled(False)
@@ -198,6 +202,15 @@ class MainWindow(QMainWindow):
         self.last_applied_provider_meta = None
         self.provider_details_text = ""
         self._refresh_provider_chain()
+        self._auto_apportion_on_start()
+
+    def _auto_apportion_on_start(self):
+        api_key = self.api_key_input.text()
+        if api_key:
+            try:
+                self.run_apportionment_calculation()
+            except Exception:
+                pass
 
     def clear_cache(self):
         cache_dir = ".cache"
@@ -425,11 +438,13 @@ class MainWindow(QMainWindow):
         provider_keys = [meta.key for meta in self.current_provider_chain] or ["county_presidential"]
         active_meta = self.current_provider_chain[0] if self.current_provider_chain else None
         election_year = self.election_year_combo.currentData() if active_meta and active_meta.supports_year_selection else None
+        resolution = "tract" if self.fast_mode_checkbox.isChecked() else "block"
         self.worker = DataFetcherWorker(
             state_fips,
             api_key,
             election_year=election_year,
-            provider_keys=provider_keys
+            provider_keys=provider_keys,
+            resolution=resolution
         )
         self.worker.moveToThread(self.thread)
 
