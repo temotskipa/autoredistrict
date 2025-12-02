@@ -51,7 +51,7 @@ class CountyPresidentialReturnsProvider:
             (df["year"] == election_year)
             & (df["state_po"] == state.abbr)
             & (df["office"].str.contains("PRESIDENT", case=False, na=False))
-        ]
+            ]
         if df_state.empty:
             return None
 

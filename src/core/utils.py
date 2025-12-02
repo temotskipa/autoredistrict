@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 
+
 def ensure_numeric(df: pd.DataFrame, columns):
     """Coerce columns to numeric, filling NaN with 0."""
     for col in columns:

@@ -3,4 +3,6 @@ name = "autoredistrict"
 version = "0.1.0"
 description = "Add your description here"
 requires-python = ">=3.14"
-dependencies = []
+dependencies = [
+    "pandas-stubs==2.3.3.251201",
+]

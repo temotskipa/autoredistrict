@@ -1,21 +1,22 @@
+import logging
 import os
+import random
+import shutil
+import time
 import zipfile
+from datetime import datetime
+
 import pandas as pd
+import requests
 from PyQt5.QtCore import QObject, pyqtSignal
 from census import Census
-import requests
-from datetime import datetime
-import shutil
-import logging
-import time
-import random
 
 from ..data.partisan_providers import (
-    AVAILABLE_PARTISAN_YEARS,
     DEFAULT_PARTISAN_YEAR,
     PROVIDER_REGISTRY,
     fetch_scores_for_provider,
 )
+
 
 class DataFetcherWorker(QObject):
     finished = pyqtSignal(pd.DataFrame, str)
@@ -94,7 +95,8 @@ class DataFetcherWorker(QObject):
 
     def _get_tracts_for_county(self, state_fips, county_fips):
         try:
-            data = self._with_retries(lambda: self.c.pl.get('NAME', {'for': 'tract:*', 'in': f'state:{state_fips} county:{county_fips}'}))
+            data = self._with_retries(
+                lambda: self.c.pl.get('NAME', {'for': 'tract:*', 'in': f'state:{state_fips} county:{county_fips}'}))
             return [item['tract'] for item in data]
         except Exception as e:
             print(f"An error occurred while fetching tracts for county {county_fips}: {e}")
@@ -131,7 +133,8 @@ class DataFetcherWorker(QObject):
                 continue
             if self.resolution == "tract":
                 try:
-                    data = self.c.pl.get(self.CENSUS_FIELDS, {'for': 'tract:*', 'in': f'state:{state_fips} county:{county_fips}'})
+                    data = self.c.pl.get(self.CENSUS_FIELDS,
+                                         {'for': 'tract:*', 'in': f'state:{state_fips} county:{county_fips}'})
                     all_census_data.extend(data)
                 except Exception as e:
                     self.logger.warning(f"Tract fetch failed for county {county_fips}: {e}")
@@ -139,7 +142,8 @@ class DataFetcherWorker(QObject):
             else:
                 for tract_fips in tracts:
                     try:
-                        data = self.c.pl.get(self.CENSUS_FIELDS, {'for': 'block:*', 'in': f'state:{state_fips} county:{county_fips} tract:{tract_fips}'})
+                        data = self.c.pl.get(self.CENSUS_FIELDS, {'for': 'block:*',
+                                                                  'in': f'state:{state_fips} county:{county_fips} tract:{tract_fips}'})
                         all_census_data.extend(data)
                     except Exception as e:
                         self.logger.warning(f"Block fetch failed for tract {tract_fips} county {county_fips}: {e}")

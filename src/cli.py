@@ -6,29 +6,28 @@ Outputs key plan metrics and saves the rendered map and shapefile so
 results can be inspected without launching the Qt GUI.
 """
 import argparse
+import json
+import logging
 import os
 import sys
+from datetime import datetime
 from typing import List, Tuple
 
 import geopandas as gpd
+import numpy as np
 import pandas as pd
 import us
-import logging
-import json
-from datetime import datetime
-import numpy as np
+from shapely.geometry import box
 
+from .core.apportionment import calculate_apportionment
 from .core.redistricting_algorithms import (
     RedistrictingAlgorithm,
     _polsby_popper_static,
     _weighted_partisan_share,
 )
-from .core.utils import is_contiguous
+from .data.data_fetcher import DataFetcher
 from .rendering.map_generator import MapGenerator
 from .workers.data_worker import DataFetcherWorker
-from .data.data_fetcher import DataFetcher
-from .core.apportionment import calculate_apportionment
-from shapely.geometry import box
 
 
 def _state_fips(arg: str) -> str:
@@ -307,7 +306,8 @@ def main(argv=None):
                         idx = json.load(fp)
                 except Exception:
                     idx = []
-                idx = [m for m in idx if not (m.get("state_fips") == args.state and m.get("resolution") == args.resolution)]
+                idx = [m for m in idx if
+                       not (m.get("state_fips") == args.state and m.get("resolution") == args.resolution)]
                 idx.append(meta)
                 with open(index_path, "w") as fp:
                     json.dump(idx, fp, indent=2)
@@ -370,7 +370,8 @@ def main(argv=None):
         _print_metrics(metrics)
         print("\nTip: open the PNG or load the shapefile in a GIS viewer to inspect the lines.")
         # validation summary
-        devs = [abs(m[1] - sum(met[1] for met in metrics)/len(metrics)) / (sum(met[1] for met in metrics)/len(metrics)) * 100 for m in metrics]
+        devs = [abs(m[1] - sum(met[1] for met in metrics) / len(metrics)) / (
+                    sum(met[1] for met in metrics) / len(metrics)) * 100 for m in metrics]
         comp = [m[3] for m in metrics]
         print(f"\nValidation: max deviation {max(devs):.2f}%, avg compactness {np.mean(comp):.3f}")
 

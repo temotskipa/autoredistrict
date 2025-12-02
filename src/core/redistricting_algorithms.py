@@ -1,16 +1,17 @@
-import geopandas as gpd
-import numpy as np
-import pandas as pd
-from shapely.geometry import LineString
 import multiprocessing
 from functools import partial
+
+import numpy as np
+import pandas as pd
 
 
 class Signal:
     def __init__(self):
         self._subs = []
+
     def connect(self, fn):
         self._subs.append(fn)
+
     def emit(self, value):
         for fn in self._subs:
             fn(value)
@@ -40,7 +41,9 @@ def _polsby_popper_static(gdf):
         return 0
     return (4 * np.pi * area) / (perimeter ** 2)
 
-def _calculate_split_score_static(area_gdf, part1, part2, target_pop1, population_equality_weight, compactness_weight, partisan_weight, vra_compliance, communities_of_interest, coi_weight):
+
+def _calculate_split_score_static(area_gdf, part1, part2, target_pop1, population_equality_weight, compactness_weight,
+                                  partisan_weight, vra_compliance, communities_of_interest, coi_weight):
     """
     Calculates a score for a given split based on population balance, compactness, and VRA compliance.
     """
@@ -90,7 +93,9 @@ def _calculate_split_score_static(area_gdf, part1, part2, target_pop1, populatio
             coi_weight * coi_score +
             vra_score)
 
-def _process_angle(angle, area_gdf, centroid, target_pop1, population_equality_weight, compactness_weight, partisan_weight, vra_compliance, communities_of_interest, coi_weight):
+
+def _process_angle(angle, area_gdf, centroid, target_pop1, population_equality_weight, compactness_weight,
+                   partisan_weight, vra_compliance, communities_of_interest, coi_weight):
     rad = np.deg2rad(angle)
     c_x, c_y = centroid.x, centroid.y
 
@@ -104,7 +109,9 @@ def _process_angle(angle, area_gdf, centroid, target_pop1, population_equality_w
     if part1.empty or part2.empty:
         return float('inf'), None
 
-    score = _calculate_split_score_static(area_gdf, part1, part2, target_pop1, population_equality_weight, compactness_weight, partisan_weight, vra_compliance, communities_of_interest, coi_weight)
+    score = _calculate_split_score_static(area_gdf, part1, part2, target_pop1, population_equality_weight,
+                                          compactness_weight, partisan_weight, vra_compliance, communities_of_interest,
+                                          coi_weight)
 
     return score, {'part1': part1, 'part2': part2}
 
@@ -112,7 +119,8 @@ def _process_angle(angle, area_gdf, centroid, target_pop1, population_equality_w
 class RedistrictingAlgorithm:
     progress_update = Signal()
 
-    def __init__(self, state_data, num_districts, population_equality_weight=1.0, compactness_weight=1.0, partisan_weight=0.0, vra_compliance=False, communities_of_interest=None, coi_weight=1.0):
+    def __init__(self, state_data, num_districts, population_equality_weight=1.0, compactness_weight=1.0,
+                 partisan_weight=0.0, vra_compliance=False, communities_of_interest=None, coi_weight=1.0):
         super().__init__()
         self.state_data = state_data
         for col in ['P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N']:
@@ -149,8 +157,9 @@ class RedistrictingAlgorithm:
 
         best_split = self._find_best_split(area_gdf, num_districts_1, num_districts_2)
 
-        if best_split is None or 'part1' not in best_split or 'part2' not in best_split or best_split['part1'].empty or best_split['part2'].empty:
-             # If no valid split is found, return the area as a single district
+        if best_split is None or 'part1' not in best_split or 'part2' not in best_split or best_split['part1'].empty or \
+                best_split['part2'].empty:
+            # If no valid split is found, return the area as a single district
             return [area_gdf]
 
         districts_1 = self._recursive_partition(best_split['part1'], num_districts_1)

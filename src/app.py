@@ -1,25 +1,28 @@
-import sys
 import json
-import us
-import shutil
 import os
-from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit, QProgressBar, QGroupBox
-from PyQt5.QtCore import Qt, QThread
-from PyQt5.QtGui import QPixmap
-from PyQt5.QtWidgets import QFileDialog, QMessageBox
+import shutil
+import sys
+
 import geopandas as gpd
 import pandas as pd
-from .rendering.map_generator import MapGenerator
-from .data.data_fetcher import DataFetcher
-from .core.redistricting_algorithms import RedistrictingAlgorithm
+import us
+from PyQt5.QtCore import Qt, QThread
+from PyQt5.QtGui import QPixmap
+from PyQt5.QtWidgets import QApplication, QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QCheckBox, \
+    QPushButton, QGraphicsView, QGraphicsScene, QSpinBox, QSlider, QLineEdit, QProgressBar, QGroupBox
+from PyQt5.QtWidgets import QFileDialog, QMessageBox
+
 from .core.apportionment import calculate_apportionment
-from .workers.data_worker import DataFetcherWorker
+from .data.data_fetcher import DataFetcher
 from .data.partisan_providers import (
     AVAILABLE_PARTISAN_YEARS,
     provider_chain_for_state,
     available_manual_providers,
 )
+from .rendering.map_generator import MapGenerator
+from .workers.data_worker import DataFetcherWorker
 from .workers.redistricting_worker import RedistrictingWorker
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -168,7 +171,8 @@ class MainWindow(QMainWindow):
 
         # Fast mode (tract-level) toggle
         self.fast_mode_checkbox = QCheckBox('Fast mode (tract-level data)')
-        self.fast_mode_checkbox.setToolTip('Use tract-level Census + tract shapefiles for faster runs (lower resolution).')
+        self.fast_mode_checkbox.setToolTip(
+            'Use tract-level Census + tract shapefiles for faster runs (lower resolution).')
         controls_layout.addWidget(self.fast_mode_checkbox)
 
         # Export buttons
@@ -217,7 +221,8 @@ class MainWindow(QMainWindow):
         try:
             if os.path.exists(cache_dir):
                 shutil.rmtree(cache_dir)
-                QMessageBox.information(self, "Cache Cleared", f"The cache directory ({cache_dir}) has been cleared successfully.")
+                QMessageBox.information(self, "Cache Cleared",
+                                        f"The cache directory ({cache_dir}) has been cleared successfully.")
             else:
                 QMessageBox.information(self, "Cache Cleared", "No cache directory found to clear.")
         except Exception as e:
@@ -265,7 +270,8 @@ class MainWindow(QMainWindow):
         state_populations = fetcher.get_all_states_population_data()
 
         if not state_populations:
-            QMessageBox.critical(self, "Error", "Failed to fetch population data. Please check the console for details.")
+            QMessageBox.critical(self, "Error",
+                                 "Failed to fetch population data. Please check the console for details.")
             return
 
         house_size = self.house_size_spinbox.value()
@@ -304,7 +310,8 @@ class MainWindow(QMainWindow):
             self._populate_manual_provider_combo(available)
             available_keys = [meta.key for meta in available]
             if not available_keys:
-                QMessageBox.warning(self, "No Providers", "No manual providers are available for this state. Reverting to automatic selection.")
+                QMessageBox.warning(self, "No Providers",
+                                    "No manual providers are available for this state. Reverting to automatic selection.")
                 self.manual_override_checkbox.blockSignals(True)
                 self.manual_override_checkbox.setChecked(False)
                 self.manual_override_checkbox.blockSignals(False)
@@ -363,11 +370,13 @@ class MainWindow(QMainWindow):
         details = []
         for idx, meta in enumerate(self.current_provider_chain, start=1):
             role = "Active" if actual and meta.key == metadata.key else ("Primary" if idx == 1 else "Fallback")
-            details.append(f"{idx}. {meta.label} – {meta.granularity.capitalize()} • {meta.confidence} ({role})\n   {meta.description}")
+            details.append(
+                f"{idx}. {meta.label} – {meta.granularity.capitalize()} • {meta.confidence} ({role})\n   {meta.description}")
         self.provider_details_text = "\n\n".join(details) if details else "No providers available."
 
     def _show_data_details(self):
-        QMessageBox.information(self, "Partisan Data Sources", self.provider_details_text or "No provider information available yet.")
+        QMessageBox.information(self, "Partisan Data Sources",
+                                self.provider_details_text or "No provider information available yet.")
 
     def _handle_manual_override_toggled(self, checked):
         self.partisan_provider_combo.setVisible(checked)
@@ -385,7 +394,8 @@ class MainWindow(QMainWindow):
                 self.manual_override_checkbox.blockSignals(False)
                 self.partisan_provider_combo.setVisible(False)
                 return
-            self.manual_provider_key = available[0].key if self.manual_provider_key not in [meta.key for meta in available] else self.manual_provider_key
+            self.manual_provider_key = available[0].key if self.manual_provider_key not in [meta.key for meta in
+                                                                                            available] else self.manual_provider_key
             self._populate_manual_provider_combo(available)
             index = self.partisan_provider_combo.findData(self.manual_provider_key)
             if index != -1:
@@ -523,7 +533,7 @@ class MainWindow(QMainWindow):
         self.run_button.setText("Generate Map")
         self.progress_bar.setVisible(False)
         self.progress_bar.setFormat("")
-        self.update_num_districts() # Re-evaluates if run_button should be enabled
+        self.update_num_districts()  # Re-evaluates if run_button should be enabled
 
     def handle_redistricting_finished(self, districts_list):
         all_districts_gdf = gpd.GeoDataFrame()
@@ -562,11 +572,13 @@ class MainWindow(QMainWindow):
                 self.map_generator.export_to_shapefile(file_path)
                 print(f"Districts saved to {file_path}")
 
+
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
     sys.exit(app.exec_())
+
 
 if __name__ == '__main__':
     main()

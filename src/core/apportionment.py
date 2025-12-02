@@ -1,5 +1,6 @@
 import math
 
+
 def calculate_apportionment(state_populations, house_size):
     """
     Calculates the apportionment of House seats to states using the Huntington-Hill method.

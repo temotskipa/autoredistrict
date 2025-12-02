@@ -1,4 +1,3 @@
-import os
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,7 +10,6 @@ import yaml
 
 from .partisan_data import CountyPresidentialReturnsProvider
 
-
 AVAILABLE_PARTISAN_YEARS = [2000, 2004, 2008, 2012, 2016, 2020, 2024]
 DEFAULT_PARTISAN_YEAR = AVAILABLE_PARTISAN_YEARS[-1]
 
@@ -21,7 +19,7 @@ class ProviderMetadata:
     key: str
     label: str
     granularity: str  # 'precinct', 'county'
-    confidence: str   # 'High', 'Medium', 'Low'
+    confidence: str  # 'High', 'Medium', 'Low'
     description: str
     supports_year_selection: bool
     available_years: Optional[List[int]]
@@ -270,8 +268,6 @@ def parse_precinct_csv(entry, state_fips: str, election_year: Optional[int]) -> 
     return grouped.reset_index(drop=True)[["county", "partisan_score"]]
 
 
-
-
 FETCHER_MAP: Dict[str, Callable[[str, Optional[int]], Optional[pd.DataFrame]]] = {
     "county_presidential": _fetch_county_returns,
     "medsl_state_2020": _fetch_medsl_state_returns,
@@ -322,7 +318,6 @@ PROVIDER_REGISTRY: Dict[str, ProviderMetadata] = {
 
 GLOBAL_PROVIDER_KEYS: List[str] = ["county_presidential", "harvard_house_2018"]
 
-
 METADATA_PARSER_DISPATCH = {
     "precinct_csv": parse_precinct_csv,
 }
@@ -336,8 +331,10 @@ def _register_metadata_providers():
             continue
         provider_key = entry["provider_key"]
         available_years = [entry["year"]] if entry.get("year") else None
+
         def fetcher(state_fips, election_year, entry=entry, parser=parser):
             return parser(entry, state_fips, election_year)
+
         FETCHER_MAP[provider_key] = fetcher
         PROVIDER_REGISTRY[provider_key] = ProviderMetadata(
             key=provider_key,
@@ -375,7 +372,8 @@ def _year_distance(meta: ProviderMetadata, requested_year: Optional[int]) -> int
     return min(abs(year - requested_year) for year in meta.available_years)
 
 
-def provider_chain_for_state(state_fips: Optional[str], requested_year: Optional[int], manual_override_key: Optional[str] = None) -> List[ProviderMetadata]:
+def provider_chain_for_state(state_fips: Optional[str], requested_year: Optional[int],
+                             manual_override_key: Optional[str] = None) -> List[ProviderMetadata]:
     """
     Returns an ordered list of provider metadata representing the hierarchy to attempt.
     """
@@ -422,7 +420,8 @@ def available_manual_providers(state_fips: Optional[str], requested_year: Option
     return auto_chain
 
 
-def fetch_scores_for_provider(meta: ProviderMetadata, state_fips: str, election_year: Optional[int]) -> Optional[pd.DataFrame]:
+def fetch_scores_for_provider(meta: ProviderMetadata, state_fips: str, election_year: Optional[int]) -> Optional[
+    pd.DataFrame]:
     fetcher = FETCHER_MAP.get(meta.fetcher_key)
     if not fetcher:
         return None
@@ -457,5 +456,6 @@ def _load_metadata_providers():
         entry["state_fips"] = state.fips
         valid_entries.append(entry)
     return valid_entries
+
 
 _register_metadata_providers()

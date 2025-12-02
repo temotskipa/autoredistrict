@@ -1,12 +1,15 @@
 from PyQt5.QtCore import QObject, pyqtSignal
+
 from ..core.redistricting_algorithms import RedistrictingAlgorithm
+
 
 class RedistrictingWorker(QObject):
     finished = pyqtSignal(object)
     progress = pyqtSignal(int)
     error = pyqtSignal(str)
 
-    def __init__(self, state_data, num_districts, algorithm_name, population_equality_weight, compactness_weight, vra_compliance, communities_of_interest):
+    def __init__(self, state_data, num_districts, algorithm_name, population_equality_weight, compactness_weight,
+                 vra_compliance, communities_of_interest):
         super().__init__()
         self.state_data = state_data
         self.num_districts = num_districts
