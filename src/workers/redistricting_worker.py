@@ -1,5 +1,5 @@
 from PyQt5.QtCore import QObject, pyqtSignal
-from autoredistrict.core.redistricting_algorithms import RedistrictingAlgorithm
+from ..core.redistricting_algorithms import RedistrictingAlgorithm
 
 class RedistrictingWorker(QObject):
     finished = pyqtSignal(object)
@@ -18,13 +18,27 @@ class RedistrictingWorker(QObject):
 
     def run(self):
         try:
+            coi_list = None
+            if self.communities_of_interest:
+                try:
+                    import pandas as pd
+                    coi_df = pd.read_csv(self.communities_of_interest, dtype=str)
+                    geoid_col = None
+                    for candidate in ("GEOID", "geoid", "geoid20", "GEOID20"):
+                        if candidate in coi_df.columns:
+                            geoid_col = candidate
+                            break
+                    if geoid_col:
+                        coi_list = coi_df[geoid_col].astype(str).str.zfill(15).tolist()
+                except Exception:
+                    coi_list = None
             algorithm = RedistrictingAlgorithm(
                 self.state_data,
                 self.num_districts,
                 population_equality_weight=self.population_equality_weight,
                 compactness_weight=self.compactness_weight,
                 vra_compliance=self.vra_compliance,
-                communities_of_interest=self.communities_of_interest
+                communities_of_interest=coi_list
             )
             algorithm.progress_update.connect(self.progress.emit)
 
