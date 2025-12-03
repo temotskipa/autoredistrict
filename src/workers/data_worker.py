@@ -5,10 +5,10 @@ import shutil
 import time
 import zipfile
 from datetime import datetime
+from typing import Callable, Optional
 
 import pandas as pd
 import requests
-from PyQt5.QtCore import QObject, pyqtSignal
 from census import Census
 
 from ..data.partisan_providers import (
@@ -18,15 +18,21 @@ from ..data.partisan_providers import (
 )
 
 
-class DataFetcherWorker(QObject):
-    finished = pyqtSignal(pd.DataFrame, str)
-    error = pyqtSignal(str)
-    progress = pyqtSignal(int)
+class DataFetcherWorker:
 
     CENSUS_FIELDS = ('NAME', 'P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N')
 
-    def __init__(self, state_fips, api_key, election_year=None, provider_keys=None, resolution="block"):
-        super().__init__()
+    def __init__(
+        self,
+        state_fips,
+        api_key,
+        election_year=None,
+        provider_keys=None,
+        resolution="block",
+        progress_callback: Optional[Callable[[int], None]] = None,
+        finished_callback: Optional[Callable[[pd.DataFrame, str], None]] = None,
+        error_callback: Optional[Callable[[str], None]] = None,
+    ):
         self.state_fips = state_fips
         self.api_key = api_key
         self.c = Census(self.api_key)
@@ -35,6 +41,31 @@ class DataFetcherWorker(QObject):
         self.active_provider_meta = None
         self.logger = logging.getLogger(__name__)
         self.resolution = resolution  # "block" (default) or "tract"
+        self.progress_callback = progress_callback
+        self.finished_callback = finished_callback
+        self.error_callback = error_callback
+
+    # ------------- event helpers ------------- #
+    def _emit_progress(self, value: int):
+        if self.progress_callback:
+            try:
+                self.progress_callback(int(value))
+            except Exception:
+                pass
+
+    def _emit_finished(self, census_df, shapefile_path):
+        if self.finished_callback:
+            try:
+                self.finished_callback(census_df, shapefile_path)
+            except Exception:
+                pass
+
+    def _emit_error(self, message: str):
+        if self.error_callback:
+            try:
+                self.error_callback(message)
+            except Exception:
+                pass
 
     # ------------- cache helpers ------------- #
     def _cache_paths(self, state_fips):
@@ -79,11 +110,11 @@ class DataFetcherWorker(QObject):
             shapefile_path = self._get_shapefiles(self.state_fips)
 
             if census_df is not None and shapefile_path:
-                self.finished.emit(census_df, shapefile_path)
+                self._emit_finished(census_df, shapefile_path)
             else:
-                self.error.emit("Failed to fetch data.")
+                self._emit_error("Failed to fetch data.")
         except Exception as e:
-            self.error.emit(str(e))
+            self._emit_error(str(e))
 
     def _get_counties_for_state(self, state_fips):
         try:
@@ -148,7 +179,7 @@ class DataFetcherWorker(QObject):
                     except Exception as e:
                         self.logger.warning(f"Block fetch failed for tract {tract_fips} county {county_fips}: {e}")
                         continue
-            self.progress.emit(int(((i + 1) / num_counties) * 75))
+            self._emit_progress(int(((i + 1) / num_counties) * 75))
 
         if not all_census_data:
             return None
@@ -218,12 +249,12 @@ class DataFetcherWorker(QObject):
                         shutil.rmtree(shapefile_dir)
                     elif os.path.exists(shapefile_path):
                         self.logger.info(f"Using cached shapefile directory: {shapefile_dir}")
-                        self.progress.emit(100)
-                        return shapefile_path
+                self._emit_progress(100)
+                return shapefile_path
             except requests.RequestException as e:
                 self.logger.warning(f"Could not check for newer shapefile, using cache. Error: {e}")
                 if os.path.exists(shapefile_path):
-                    self.progress.emit(100)
+                    self._emit_progress(100)
                     return shapefile_path
                 # Cache directory exists but shapefile is missing; fall through to re-download.
 
@@ -243,10 +274,10 @@ class DataFetcherWorker(QObject):
                 if candidates:
                     shapefile_path = os.path.join(shapefile_dir, candidates[0])
             if os.path.exists(shapefile_path):
-                self.progress.emit(100)
+                self._emit_progress(100)
                 return shapefile_path
             self.logger.error("Extracted shapefile missing .shp file.")
-            self.progress.emit(100)
+            self._emit_progress(100)
             return None
         except Exception as e:
             self.logger.error(f"An error occurred while downloading the shapefile: {e}")

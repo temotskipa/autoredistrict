@@ -3,8 +3,9 @@ geopandas
 matplotlib
 numpy
 pandas
-PyQt5
 requests
 shapely
 us
 pydataverse
+PyYAML
+ttkbootstrap

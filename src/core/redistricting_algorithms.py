@@ -1,4 +1,4 @@
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 from functools import partial
 
 import numpy as np
@@ -178,20 +178,22 @@ class RedistrictingAlgorithm:
         centroid = area_gdf_proj.unary_union.centroid
         angles = np.linspace(0, 180, 10)
 
-        # Use functools.partial to create a function with most arguments already filled in
-        worker_func = partial(_process_angle,
-                              area_gdf=area_gdf_proj,
-                              centroid=centroid,
-                              target_pop1=target_pop1,
-                              population_equality_weight=self.population_equality_weight,
-                              compactness_weight=self.compactness_weight,
-                              partisan_weight=self.partisan_weight,
-                              vra_compliance=self.vra_compliance,
-                              communities_of_interest=self.communities_of_interest,
-                              coi_weight=self.coi_weight)
+        worker_func = partial(
+            _process_angle,
+            area_gdf=area_gdf_proj,
+            centroid=centroid,
+            target_pop1=target_pop1,
+            population_equality_weight=self.population_equality_weight,
+            compactness_weight=self.compactness_weight,
+            partisan_weight=self.partisan_weight,
+            vra_compliance=self.vra_compliance,
+            communities_of_interest=self.communities_of_interest,
+            coi_weight=self.coi_weight,
+        )
 
-        with multiprocessing.Pool() as pool:
-            results = pool.map(worker_func, angles)
+        # Use threads instead of processes to avoid spawn/pickle overhead on free-threading Python.
+        with ThreadPoolExecutor(max_workers=min(len(angles), 8)) as executor:
+            results = list(executor.map(worker_func, angles))
 
         best_score = float('inf')
         best_split = None
