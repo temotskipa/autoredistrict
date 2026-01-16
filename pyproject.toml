@@ -1,8 +1,19 @@
 [project]
 name = "autoredistrict"
 version = "0.1.0"
-description = "Add your description here"
-requires-python = ">=3.14"
+description = "Congressional redistricting application with automatic district generation"
+requires-python = ">=3.11"
 dependencies = [
-    "pandas-stubs==2.3.3.251201",
+    "census",
+    "geopandas",
+    "matplotlib",
+    "numpy",
+    "pandas",
+    "pandas-stubs>=2.0.0",
+    "requests",
+    "shapely",
+    "us",
+    "pydataverse",
+    "PyYAML",
+    "ttkbootstrap",
 ]

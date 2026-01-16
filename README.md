@@ -28,9 +28,9 @@ This application allows users to automatically generate congressional district m
 
 ## How to Run
 
-To run the application, execute the `main.py` file:
+To run the application, execute the `src.app` module:
 ```bash
-python main.py
+python -m src.app
 ```
 
 This will open the main application window, where you can select a state, choose an algorithm, and generate a district map.
@@ -39,7 +39,7 @@ This will open the main application window, where you can select a state, choose
 
 For quick smoke tests or server use, run the CLI:
 ```bash
-python -m src.autoredistrict.cli <state> --api-key $CENSUS_API_KEY --map-out map.png --shp-out districts.shp
+python -m src.cli <state> --api-key $CENSUS_API_KEY --map-out map.png --shp-out districts.shp
 ```
 
 To exercise the pipeline without network/API keys, use the synthetic demo dataset:

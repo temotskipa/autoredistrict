@@ -25,6 +25,7 @@ from .core.redistricting_algorithms import (
     _polsby_popper_static,
     _weighted_partisan_share,
 )
+from .core.utils import is_contiguous
 from .data.data_fetcher import DataFetcher
 from .rendering.map_generator import MapGenerator
 from .workers.data_worker import DataFetcherWorker
@@ -183,9 +184,13 @@ def _demo_dataset(size=4, rich=False):
 
 def _merge_data(shapefile_path: str, census_df: pd.DataFrame) -> gpd.GeoDataFrame:
     state_gdf = gpd.read_file(shapefile_path)
-    if "GEOID20" not in state_gdf.columns:
-        raise RuntimeError("Shapefile missing GEOID20 field.")
-    state_gdf["GEOID"] = state_gdf["GEOID20"]
+    if "GEOID" in state_gdf.columns:
+        pass  # GEOID is already present
+    elif "GEOID20" in state_gdf.columns:
+        state_gdf["GEOID"] = state_gdf["GEOID20"]
+    else:
+        raise RuntimeError("Shapefile missing GEOID/GEOID20 field.")
+
     merged = state_gdf.merge(census_df, on="GEOID")
 
     if "partisan_score" not in merged.columns:
@@ -382,7 +387,7 @@ def main(argv=None):
         assert len(set(partisan_vals)) >= 2, "Expected partisan variation across districts"
         # contiguity check
         for d_idx, gdf in enumerate(districts):
-            assert _is_contiguous(gdf), f"District {d_idx} is not contiguous"
+            assert is_contiguous(gdf), f"District {d_idx} is not contiguous"
         # COI check: force top-left 3 cells to stay together
         coi_list = [g for g in merged_gdf["GEOID"].head(3).tolist()]
         # run a COI-enforced plan and ensure same district

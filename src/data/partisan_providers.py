@@ -11,7 +11,11 @@ import yaml
 from .partisan_data import CountyPresidentialReturnsProvider
 
 AVAILABLE_PARTISAN_YEARS = [2000, 2004, 2008, 2012, 2016, 2020, 2024]
-DEFAULT_PARTISAN_YEAR = AVAILABLE_PARTISAN_YEARS[-1]
+DEFAULT_PARTISAN_YEAR = 2020
+
+# Harvard Dataverse US House 2018 precinct-level dataset
+HARVARD_2018_FILE_URL = "https://dataverse.harvard.edu/api/access/datafile/3814252"
+HARVARD_2018_CACHE = Path(".cache") / "harvard_house" / "us-house-precinct-2018.zip"
 
 
 @dataclass(frozen=True)

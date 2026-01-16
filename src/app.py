@@ -151,7 +151,7 @@ class MainWindow(tb.Window):
         tb.Label(controls, text="Select Algorithm:").pack(anchor="w", pady=(6, 0))
         self.algorithm_combo = tb.Combobox(
             controls,
-            values=["Divide and Conquer (Fair)", "Gerrymander (Packed)"],
+            values=["Divide and Conquer (Fair)", "Gerrymander (Democrat)", "Gerrymander (Republican)"],
             textvariable=self.algorithm_var,
             state="readonly",
         )
@@ -595,7 +595,11 @@ class MainWindow(tb.Window):
 
         try:
             state_gdf = gpd.read_file(shapefile_path)
-            state_gdf["GEOID"] = state_gdf["GEOID20"]
+            if "GEOID" not in state_gdf.columns:
+                if "GEOID20" in state_gdf.columns:
+                    state_gdf["GEOID"] = state_gdf["GEOID20"]
+                else:
+                    raise RuntimeError("Shapefile missing GEOID/GEOID20 field.")
             merged_gdf = state_gdf.merge(census_df, on="GEOID")
             if "partisan_score" not in merged_gdf.columns:
                 merged_gdf["partisan_score"] = 0.5

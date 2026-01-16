@@ -65,14 +65,22 @@ class RedistrictingWorker:
                         coi_list = coi_df[geoid_col].astype(str).str.zfill(15).tolist()
                 except Exception:
                     coi_list = None
-                algorithm = RedistrictingAlgorithm(
-                    self.state_data,
-                    self.num_districts,
-                    population_equality_weight=self.population_equality_weight,
-                    compactness_weight=self.compactness_weight,
-                    vra_compliance=self.vra_compliance,
-                    communities_of_interest=coi_list
-                )
+            
+            target_party = None
+            if "Democrat" in self.algorithm_name:
+                target_party = 1
+            elif "Republican" in self.algorithm_name:
+                target_party = 0
+
+            algorithm = RedistrictingAlgorithm(
+                self.state_data,
+                self.num_districts,
+                population_equality_weight=self.population_equality_weight,
+                compactness_weight=self.compactness_weight,
+                vra_compliance=self.vra_compliance,
+                communities_of_interest=coi_list,
+                target_party=target_party
+            )
             algorithm.progress_update.connect(self._emit_progress)
 
             if "Divide and Conquer" in self.algorithm_name:

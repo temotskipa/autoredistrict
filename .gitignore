@@ -12,7 +12,7 @@ venv/
 .vscode/
 
 # Temporary files
-temp_map.png
+*.png
 *.zip
 shapefiles_*/
 config.json

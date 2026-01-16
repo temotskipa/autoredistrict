@@ -1,10 +1,10 @@
+import logging
 import os
-from functools import lru_cache
 from typing import Optional
+import requests
 
 import pandas as pd
 import us
-from pyDataverse.api import DataAccessApi, NativeApi
 
 
 class CountyPresidentialReturnsProvider:
@@ -13,13 +13,11 @@ class CountyPresidentialReturnsProvider:
     Provides partisan scores for arbitrary states and election years.
     """
 
-    BASE_URL = "https://dataverse.harvard.edu"
-    DATASET_ID = "doi:10.7910/DVN/VOQCHQ"
+    # Direct download for "countypres_2000-2024.tab" (ID 13256842)
+    FILE_URL = "https://dataverse.harvard.edu/api/access/datafile/13256842"
     COUNTY_FILE_LABEL = "countypres_2000-2024.tab"
 
     def __init__(self, cache_root: str = ".cache"):
-        self.native_api = NativeApi(self.BASE_URL)
-        self.data_api = DataAccessApi(self.BASE_URL)
         self.cache_dir = os.path.join(cache_root, "partisan")
         os.makedirs(self.cache_dir, exist_ok=True)
 
@@ -83,6 +81,7 @@ class CountyPresidentialReturnsProvider:
         if pivot.empty:
             return None
 
+        # county_fips is 5 digits (e.g. 23001), we need last 3 for 'county' (e.g. 001)
         pivot["county"] = pivot["county_fips"].str[-3:]
         pivot["partisan_score"] = pivot["DEMOCRAT"] / pivot["total_votes"]
 
@@ -94,29 +93,20 @@ class CountyPresidentialReturnsProvider:
         """
         cache_path = os.path.join(self.cache_dir, self.COUNTY_FILE_LABEL)
         if os.path.exists(cache_path):
-            return cache_path
+            if os.path.getsize(cache_path) > 0:
+                return cache_path
+            # Corrupt empty file
+            os.remove(cache_path)
 
-        file_id = self._resolve_file_id()
-        if not file_id:
-            return None
+        print(f"Downloading partisan data from {self.FILE_URL}...")
         try:
-            response = self.data_api.get_datafile(file_id)
+            response = requests.get(self.FILE_URL, stream=True, timeout=120)
             response.raise_for_status()
             with open(cache_path, "wb") as outfile:
-                outfile.write(response.content)
+                for chunk in response.iter_content(chunk_size=1024 * 1024):
+                    if chunk:
+                        outfile.write(chunk)
             return cache_path
         except Exception as exc:
-            print(f"Failed to download Dataverse file {file_id}: {exc}")
+            print(f"Failed to download partisan data: {exc}")
             return None
-
-    @lru_cache()
-    def _resolve_file_id(self) -> Optional[int]:
-        try:
-            dataset = self.native_api.get_dataset(self.DATASET_ID)
-            files = dataset.json()["data"]["latestVersion"]["files"]
-            for file_info in files:
-                if file_info.get("label") == self.COUNTY_FILE_LABEL:
-                    return file_info["dataFile"]["id"]
-        except Exception as exc:
-            print(f"Unable to resolve Dataverse file id: {exc}")
-        return None

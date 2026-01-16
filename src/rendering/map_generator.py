@@ -54,6 +54,10 @@ class MapGenerator:
         else:
             plot_kwargs.update({"cmap": "viridis"})
 
+        # Reproject to US National Atlas Equal Area for better shape (if not already projected)
+        if display_gdf.crs.is_geographic:
+            display_gdf = display_gdf.to_crs(epsg=2163)
+
         display_gdf.plot(**plot_kwargs)
         ax.set_axis_off()
         plt.savefig(output_path, bbox_inches="tight")

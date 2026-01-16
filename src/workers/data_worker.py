@@ -1,3 +1,4 @@
+import concurrent.futures
 import logging
 import os
 import random
@@ -144,6 +145,32 @@ class DataFetcherWorker:
                 self.logger.warning(f"Retrying after error: {exc} (attempt {attempt}/{retries})")
                 time.sleep(delay)
 
+    def _fetch_county_data(self, state_fips, county_fips):
+        """Helper to fetch data for a single county (executed in thread)."""
+        county_data = []
+        tracts = self._get_tracts_for_county(state_fips, county_fips)
+        if not tracts:
+            return []
+
+        if self.resolution == "tract":
+            try:
+                # Fetch all tracts for county in one go
+                data = self.c.pl.get(self.CENSUS_FIELDS,
+                                     {'for': 'tract:*', 'in': f'state:{state_fips} county:{county_fips}'})
+                county_data.extend(data)
+            except Exception as e:
+                self.logger.warning(f"Tract fetch failed for county {county_fips}: {e}")
+        else:
+            # Block resolution: iterate tracts
+            for tract_fips in tracts:
+                try:
+                    data = self.c.pl.get(self.CENSUS_FIELDS, {'for': 'block:*',
+                                                              'in': f'state:{state_fips} county:{county_fips} tract:{tract_fips}'})
+                    county_data.extend(data)
+                except Exception as e:
+                    self.logger.warning(f"Block fetch failed for tract {tract_fips} county {county_fips}: {e}")
+        return county_data
+
     def _get_census_data(self, state_fips):
         cached_df = self._load_cache(state_fips)
         if cached_df is not None:
@@ -158,28 +185,28 @@ class DataFetcherWorker:
 
         all_census_data = []
         num_counties = len(counties)
-        for i, county_fips in enumerate(counties):
-            tracts = self._get_tracts_for_county(state_fips, county_fips)
-            if not tracts:
-                continue
-            if self.resolution == "tract":
+        
+        # Use ThreadPoolExecutor for parallel fetching
+        # Census API is I/O bound, so threads work well even with GIL.
+        # With free-threading, this scales even better.
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_county = {
+                executor.submit(self._fetch_county_data, state_fips, county_fips): county_fips 
+                for county_fips in counties
+            }
+            
+            completed_count = 0
+            for future in concurrent.futures.as_completed(future_to_county):
+                county_fips = future_to_county[future]
                 try:
-                    data = self.c.pl.get(self.CENSUS_FIELDS,
-                                         {'for': 'tract:*', 'in': f'state:{state_fips} county:{county_fips}'})
-                    all_census_data.extend(data)
-                except Exception as e:
-                    self.logger.warning(f"Tract fetch failed for county {county_fips}: {e}")
-                    continue
-            else:
-                for tract_fips in tracts:
-                    try:
-                        data = self.c.pl.get(self.CENSUS_FIELDS, {'for': 'block:*',
-                                                                  'in': f'state:{state_fips} county:{county_fips} tract:{tract_fips}'})
+                    data = future.result()
+                    if data:
                         all_census_data.extend(data)
-                    except Exception as e:
-                        self.logger.warning(f"Block fetch failed for tract {tract_fips} county {county_fips}: {e}")
-                        continue
-            self._emit_progress(int(((i + 1) / num_counties) * 75))
+                except Exception as exc:
+                    self.logger.error(f"County {county_fips} fetch generated an exception: {exc}")
+                
+                completed_count += 1
+                self._emit_progress(int((completed_count / num_counties) * 75))
 
         if not all_census_data:
             return None
@@ -227,8 +254,8 @@ class DataFetcherWorker:
 
     def _get_shapefiles(self, state_fips):
         cache_dir = ".cache"
-        suffix = "tract20" if self.resolution == "tract" else "tabblock20"
-        base_folder = "TTRACT20" if self.resolution == "tract" else "TABBLOCK20"
+        suffix = "tract" if self.resolution == "tract" else "tabblock20"
+        base_folder = "TRACT" if self.resolution == "tract" else "TABBLOCK20"
         shapefile_dir = os.path.join(cache_dir, f"shapefiles_{state_fips}_{self.resolution}")
         shapefile_base = f"tl_2024_{state_fips}_{suffix}"
         shapefile_path = os.path.join(shapefile_dir, f"{shapefile_base}.shp")

@@ -43,7 +43,7 @@ def _polsby_popper_static(gdf):
 
 
 def _calculate_split_score_static(area_gdf, part1, part2, target_pop1, population_equality_weight, compactness_weight,
-                                  partisan_weight, vra_compliance, communities_of_interest, coi_weight):
+                                  partisan_weight, vra_compliance, communities_of_interest, coi_weight, target_party=None):
     """
     Calculates a score for a given split based on population balance, compactness, and VRA compliance.
     """
@@ -76,7 +76,41 @@ def _calculate_split_score_static(area_gdf, part1, part2, target_pop1, populatio
     if partisan_weight > 0:
         party1_part1 = _weighted_partisan_share(part1)
         party1_part2 = _weighted_partisan_share(part2)
-        partisan_score = 1 - abs(party1_part1 - 0.5) - abs(party1_part2 - 0.5)
+
+        if target_party is not None:
+            # Targeted Gerrymander Strategy: "Efficient Win / Pack Opponent"
+            # Scores range 0 (Perfect) to ~10 (Worst).
+            
+            def get_gerrymander_penalty(share, party):
+                # Asymmetric penalty to favor safe wins (e.g. 0.55+) over risky ties (0.50)
+                if party == 1:  # Target: Dem
+                    if share >= 0.5:
+                        # Trying to win
+                        if share < 0.55:
+                            return (0.55 - share) * 10  # High penalty for being just short (0.50-0.54)
+                        else:
+                            return (share - 0.55) * 1   # Low penalty for wasting votes (0.56+)
+                    else:
+                        # Losing district -> Reduce Dem votes to 0 (Pack GOP? No, Don't waste Dem votes)
+                        # We want share as close to 0 as possible.
+                        return (share - 0.0) * 2
+                else:  # Target: Rep (Minimize Dem share)
+                    if share <= 0.5:
+                        # Trying to win (Dem share <= 0.5)
+                        if share > 0.45:
+                            return (share - 0.45) * 10  # High penalty for being just short
+                        else:
+                            return (0.45 - share) * 1   # Low penalty for wasting votes
+                    else:
+                        # Losing district -> Pack Dems (1.0)
+                        return (1.0 - share) * 2
+
+            p1 = get_gerrymander_penalty(party1_part1, target_party)
+            p2 = get_gerrymander_penalty(party1_part2, target_party)
+            partisan_score = (p1 + p2) / 2
+        else:
+            # Original competitive logic
+            partisan_score = 1 - abs(party1_part1 - 0.5) - abs(party1_part2 - 0.5)
 
     coi_score = 0
     if communities_of_interest:
@@ -95,7 +129,7 @@ def _calculate_split_score_static(area_gdf, part1, part2, target_pop1, populatio
 
 
 def _process_angle(angle, area_gdf, centroid, target_pop1, population_equality_weight, compactness_weight,
-                   partisan_weight, vra_compliance, communities_of_interest, coi_weight):
+                   partisan_weight, vra_compliance, communities_of_interest, coi_weight, target_party=None):
     rad = np.deg2rad(angle)
     c_x, c_y = centroid.x, centroid.y
 
@@ -111,7 +145,7 @@ def _process_angle(angle, area_gdf, centroid, target_pop1, population_equality_w
 
     score = _calculate_split_score_static(area_gdf, part1, part2, target_pop1, population_equality_weight,
                                           compactness_weight, partisan_weight, vra_compliance, communities_of_interest,
-                                          coi_weight)
+                                          coi_weight, target_party)
 
     return score, {'part1': part1, 'part2': part2}
 
@@ -120,7 +154,7 @@ class RedistrictingAlgorithm:
     progress_update = Signal()
 
     def __init__(self, state_data, num_districts, population_equality_weight=1.0, compactness_weight=1.0,
-                 partisan_weight=0.0, vra_compliance=False, communities_of_interest=None, coi_weight=1.0):
+                 partisan_weight=0.0, vra_compliance=False, communities_of_interest=None, coi_weight=1.0, target_party=None):
         super().__init__()
         self.state_data = state_data
         for col in ['P1_001N', 'P1_003N', 'P1_004N', 'P1_005N', 'P1_006N', 'P1_007N', 'P1_008N']:
@@ -139,6 +173,7 @@ class RedistrictingAlgorithm:
         self.vra_compliance = vra_compliance
         self.communities_of_interest = communities_of_interest
         self.coi_weight = coi_weight
+        self.target_party = target_party
 
     def divide_and_conquer(self):
         self.partitions_done = 0
@@ -189,6 +224,7 @@ class RedistrictingAlgorithm:
             vra_compliance=self.vra_compliance,
             communities_of_interest=self.communities_of_interest,
             coi_weight=self.coi_weight,
+            target_party=self.target_party,
         )
 
         # Use threads instead of processes to avoid spawn/pickle overhead on free-threading Python.
