@@ -17,4 +17,3 @@ venv/
 shapefiles_*/
 config.json
 .cache
-.python-version
