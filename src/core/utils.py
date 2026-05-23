@@ -24,10 +24,11 @@ def weighted_partisan_share(gdf):
 
 def polsby_popper(gdf):
     """Polsby-Popper compactness score."""
-    if gdf.empty or gdf.unary_union.area == 0:
+    union = gdf.geometry.union_all() if not gdf.empty else None
+    if gdf.empty or union.area == 0:
         return 0
-    perimeter = gdf.unary_union.length
-    area = gdf.unary_union.area
+    perimeter = union.length
+    area = union.area
     if perimeter == 0:
         return 0
     return (4 * np.pi * area) / (perimeter ** 2)

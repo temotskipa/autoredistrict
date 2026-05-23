@@ -2,9 +2,10 @@
 name = "autoredistrict"
 version = "0.1.0"
 description = "Congressional redistricting application with automatic district generation"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "census",
+    "fastapi",
     "geopandas",
     "matplotlib",
     "numpy",
@@ -16,4 +17,14 @@ dependencies = [
     "pydataverse",
     "PyYAML",
     "ttkbootstrap",
+    "uvicorn[standard]",
 ]
+
+[dependency-groups]
+dev = [
+    "httpx",
+    "pytest",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]

@@ -1,0 +1,1 @@
+"""Autoredistrict application package."""

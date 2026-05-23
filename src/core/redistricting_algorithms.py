@@ -33,10 +33,11 @@ def _polsby_popper_static(gdf):
     """
     Calculates the Polsby-Popper compactness score for a GeoDataFrame.
     """
-    if gdf.empty or gdf.unary_union.area == 0:
+    union = gdf.geometry.union_all() if not gdf.empty else None
+    if gdf.empty or union.area == 0:
         return 0
-    perimeter = gdf.unary_union.length
-    area = gdf.unary_union.area
+    perimeter = union.length
+    area = union.area
     if perimeter == 0:
         return 0
     return (4 * np.pi * area) / (perimeter ** 2)
@@ -210,7 +211,7 @@ class RedistrictingAlgorithm:
         original_crs = area_gdf.crs
         area_gdf_proj = area_gdf.to_crs(epsg=2163)
 
-        centroid = area_gdf_proj.unary_union.centroid
+        centroid = area_gdf_proj.geometry.union_all().centroid
         angles = np.linspace(0, 180, 10)
 
         worker_func = partial(

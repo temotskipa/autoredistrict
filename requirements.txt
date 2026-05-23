@@ -1,4 +1,5 @@
 census
+fastapi
 geopandas
 matplotlib
 numpy
@@ -9,3 +10,4 @@ us
 pydataverse
 PyYAML
 ttkbootstrap
+uvicorn[standard]

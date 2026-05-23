@@ -9,6 +9,7 @@ import argparse
 import json
 import logging
 import os
+import shutil
 import sys
 from datetime import datetime
 from typing import List, Tuple
@@ -28,6 +29,7 @@ from .core.redistricting_algorithms import (
 from .core.utils import is_contiguous
 from .data.data_fetcher import DataFetcher
 from .rendering.map_generator import MapGenerator
+from .services.redistricting_service import solve_geodata_plan
 from .workers.data_worker import DataFetcherWorker
 
 
@@ -74,9 +76,15 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--algorithm",
-        choices=["fair", "gerrymander"],
+        choices=["fair", "gerrymander", "gerrymander_dem", "gerrymander_rep"],
         default="fair",
         help="Redistricting algorithm to use.",
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="Random seed for reproducible graph-solver runs.",
     )
     parser.add_argument(
         "--vra",
@@ -129,6 +137,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--shp-out",
         default=None,
         help="Optional path to save districts as ESRI Shapefile.",
+    )
+    parser.add_argument(
+        "--report-out",
+        default=None,
+        help="Optional path to save the full JSON plan report.",
     )
     parser.add_argument(
         "--demo",
@@ -229,6 +242,15 @@ def _print_metrics(metrics: List[Tuple]):
         print(
             f"{idx:>3} | {int(pop):>12} | {dev:>7.2f} | {compact:>7.3f} | {partisan:>11.3f}"
         )
+
+
+def _load_coi_geoids(path: str | None):
+    if not path:
+        return None
+    frame = pd.read_csv(path, dtype=str)
+    if "GEOID" not in frame.columns:
+        raise RuntimeError("COI CSV must contain a GEOID column.")
+    return frame["GEOID"].dropna().astype(str).tolist()
 
 
 def main(argv=None):
@@ -343,68 +365,81 @@ def main(argv=None):
         # Fallback: approximate seats by 760k ideal population per district.
         num_districts = max(1, round(total_pop / 760_000))
 
-    algo = RedistrictingAlgorithm(
-        merged_gdf,
-        num_districts,
+    print(f"Running graph solver for {num_districts} districts...")
+    result = solve_geodata_plan(
+        state_data=merged_gdf,
+        district_count=num_districts,
+        algorithm=args.algorithm,
         population_equality_weight=args.pop_weight,
         compactness_weight=args.compactness_weight,
-        partisan_weight=1.0 if args.algorithm == "gerrymander" else 0.0,
         vra_compliance=args.vra,
-        communities_of_interest=args.coi_csv,
+        communities_of_interest=_load_coi_geoids(args.coi_csv),
+        random_seed=args.seed,
+        plan_prefix="cli-demo" if demo_mode else f"cli-{args.state}",
+        source_metadata={
+            "mode": "demo" if demo_mode else "live",
+            "state_fips": args.state,
+            "resolution": args.resolution,
+            "shapefile_path": shapefile_path,
+            "vra_requested": bool(args.vra),
+            "random_seed": args.seed,
+        },
     )
-    print(f"Running {args.algorithm} algorithm for {num_districts} districts...")
-    districts = algo.divide_and_conquer() if args.algorithm == "fair" else algo.gerrymander()
 
-    # Collect into single GeoDataFrame for export/plot
-    all_gdf = gpd.GeoDataFrame()
-    for i, district_gdf in enumerate(districts):
-        district_gdf = district_gdf.copy()
-        district_gdf["district_id"] = i
-        all_gdf = pd.concat([all_gdf, district_gdf])
-
-    mg = MapGenerator(all_gdf)
-    mg.generate_map_image(args.map_out)
+    shutil.copyfile(result["artifacts"]["map_png"], args.map_out)
     print(f"Map saved to {args.map_out}")
     if args.shp_out:
+        district_gdf = gpd.read_file(result["artifacts"]["districts_geojson"])
+        mg = MapGenerator(district_gdf)
         mg.export_to_shapefile(args.shp_out)
         print(f"Shapefile saved to {args.shp_out}")
+    if args.report_out:
+        shutil.copyfile(result["artifacts"]["report_json"], args.report_out)
+        print(f"Report saved to {args.report_out}")
 
-    metrics = _compute_metrics(districts)
+    metrics = [
+        (
+            item["district_id"],
+            item["population"],
+            item["deviation_pct"],
+            item["compactness_polsby_popper"],
+            item["partisan_dem_share"],
+        )
+        for item in result["metrics"]
+    ]
     if not args.quiet:
         print("\nDistrict metrics:")
         _print_metrics(metrics)
-        print("\nTip: open the PNG or load the shapefile in a GIS viewer to inspect the lines.")
-        # validation summary
-        devs = [abs(m[1] - sum(met[1] for met in metrics) / len(metrics)) / (
-                    sum(met[1] for met in metrics) / len(metrics)) * 100 for m in metrics]
-        comp = [m[3] for m in metrics]
-        print(f"\nValidation: max deviation {max(devs):.2f}%, avg compactness {np.mean(comp):.3f}")
+        print("\nTip: open the PNG or load the GeoJSON/shapefile in a GIS viewer to inspect the lines.")
+        print(
+            "\nValidation: "
+            f"max deviation {result['summary']['max_abs_deviation_pct']:.2f}%, "
+            f"avg compactness {result['summary']['average_compactness']:.3f}, "
+            f"all contiguous {result['summary']['all_contiguous']}"
+        )
+        print(f"Artifact bundle: {os.path.dirname(result['artifacts']['report_json'])}")
 
     # Smoke-test assertions (lightweight)
     if args.mode == "smoke":
-        assert len(districts) == num_districts, "Incorrect number of districts"
+        assert result["summary"]["district_count"] == num_districts, "Incorrect number of districts"
+        assert result["summary"]["max_abs_deviation_pct"] <= 2.0, "Population deviation too high"
         partisan_vals = [round(p, 2) for *_, p in metrics]
         assert len(set(partisan_vals)) >= 2, "Expected partisan variation across districts"
-        # contiguity check
-        for d_idx, gdf in enumerate(districts):
-            assert is_contiguous(gdf), f"District {d_idx} is not contiguous"
+        assert result["summary"]["all_contiguous"], "At least one district is not contiguous"
         # COI check: force top-left 3 cells to stay together
         coi_list = [g for g in merged_gdf["GEOID"].head(3).tolist()]
-        # run a COI-enforced plan and ensure same district
-        algo2 = RedistrictingAlgorithm(
-            merged_gdf,
-            num_districts,
+        coi_result = solve_geodata_plan(
+            state_data=merged_gdf,
+            district_count=num_districts,
+            algorithm="fair",
             population_equality_weight=args.pop_weight,
             compactness_weight=args.compactness_weight,
-            partisan_weight=0.0,
-            vra_compliance=True,
             communities_of_interest=coi_list,
+            random_seed=0,
+            plan_prefix="cli-smoke-coi",
+            source_metadata={"mode": "smoke-coi"},
         )
-        districts_coi = algo2.divide_and_conquer()
-        district_map = {}
-        for didx, gdf in enumerate(districts_coi):
-            for geoid in gdf["GEOID"]:
-                district_map[geoid] = didx
+        district_map = coi_result["assignment"]
         assert len({district_map[g] for g in coi_list}) == 1, "COI group not preserved"
         print("Smoke test passed (contiguity, COI, deviation checks).")
 

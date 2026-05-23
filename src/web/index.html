@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Autoredistrict</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="controls">
+        <div class="brand">
+          <span class="mark"></span>
+          <div>
+            <h1>Autoredistrict</h1>
+            <p>Local automated plan generation</p>
+          </div>
+        </div>
+
+        <form id="plan-form" class="panel">
+          <label>
+            Data
+            <select name="mode" id="mode-select">
+              <option value="demo">Demo</option>
+              <option value="state">State</option>
+            </select>
+          </label>
+
+          <label data-state-field>
+            State
+            <input name="state" type="text" value="ME" />
+          </label>
+
+          <label data-state-field>
+            Census API key
+            <input name="api_key" type="password" autocomplete="off" />
+          </label>
+
+          <label data-state-field>
+            Resolution
+            <select name="resolution">
+              <option value="tract">Tract</option>
+              <option value="block">Block</option>
+            </select>
+          </label>
+
+          <label>
+            Algorithm
+            <select name="algorithm">
+              <option value="fair">Fair baseline</option>
+              <option value="gerrymander_dem">Democratic advantage</option>
+              <option value="gerrymander_rep">Republican advantage</option>
+            </select>
+          </label>
+
+          <label>
+            Districts
+            <input name="districts" type="text" inputmode="numeric" pattern="[0-9]+" value="4" />
+          </label>
+
+          <label data-demo-field>
+            Demo grid size
+            <input name="grid_size" type="text" inputmode="numeric" pattern="[0-9]+" value="4" />
+          </label>
+
+          <label>
+            Seed
+            <input name="random_seed" type="text" inputmode="numeric" pattern="[0-9]+" value="0" />
+          </label>
+
+          <label>
+            Population equality
+            <input name="population_equality_weight" type="range" min="0" max="1" step="0.05" value="1" />
+          </label>
+
+          <label>
+            Compactness
+            <input name="compactness_weight" type="range" min="0" max="1" step="0.05" value="1" />
+          </label>
+
+          <div class="checks">
+            <label><input name="vra" type="checkbox" /> VRA heuristic</label>
+            <label data-demo-field><input name="preserve_demo_coi" type="checkbox" /> Preserve demo COI</label>
+          </div>
+
+          <button type="submit" id="generate-button">Generate Plan</button>
+        </form>
+
+        <section class="panel status-panel">
+          <h2>Run Status</h2>
+          <p id="status-text">Ready.</p>
+          <p id="solver-text"></p>
+          <div id="warnings"></div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <section class="summary-grid" aria-label="Plan summary">
+          <div class="metric">
+            <span>Districts</span>
+            <strong id="summary-districts">-</strong>
+          </div>
+          <div class="metric">
+            <span>Max Deviation</span>
+            <strong id="summary-deviation">-</strong>
+          </div>
+          <div class="metric">
+            <span>Avg Compactness</span>
+            <strong id="summary-compactness">-</strong>
+          </div>
+          <div class="metric">
+            <span>Contiguous</span>
+            <strong id="summary-contiguous">-</strong>
+          </div>
+        </section>
+
+        <section class="map-stage">
+          <div id="map-placeholder">Generate a plan to preview the map.</div>
+          <img id="map-image" alt="Generated district map" hidden />
+        </section>
+
+        <section class="details">
+          <header>
+            <h2>District Metrics</h2>
+            <div class="downloads" id="downloads"></div>
+          </header>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Population</th>
+                  <th>Deviation</th>
+                  <th>Polsby</th>
+                  <th>Dem Share</th>
+                  <th>Units</th>
+                  <th>Contiguous</th>
+                </tr>
+              </thead>
+              <tbody id="metrics-body">
+                <tr><td colspan="7">No plan generated.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

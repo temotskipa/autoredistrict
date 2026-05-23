@@ -1,6 +1,6 @@
 from typing import Callable, Optional
 
-from ..core.redistricting_algorithms import RedistrictingAlgorithm
+from ..core.graph_solver import GraphRedistrictingSolver
 
 
 class RedistrictingWorker:
@@ -62,32 +62,42 @@ class RedistrictingWorker:
                             geoid_col = candidate
                             break
                     if geoid_col:
-                        coi_list = coi_df[geoid_col].astype(str).str.zfill(15).tolist()
+                        coi_list = (
+                            coi_df[geoid_col]
+                            .dropna()
+                            .astype(str)
+                            .str.strip()
+                            .tolist()
+                        )
                 except Exception:
                     coi_list = None
-            
+
+            partisan_weight = 0.0
             target_party = None
             if "Democrat" in self.algorithm_name:
                 target_party = 1
+                partisan_weight = 1.0
             elif "Republican" in self.algorithm_name:
                 target_party = 0
+                partisan_weight = 1.0
+            elif "Gerrymander" in self.algorithm_name:
+                partisan_weight = 1.0
 
-            algorithm = RedistrictingAlgorithm(
+            self._emit_progress(5)
+            solver = GraphRedistrictingSolver(
                 self.state_data,
                 self.num_districts,
                 population_equality_weight=self.population_equality_weight,
                 compactness_weight=self.compactness_weight,
+                partisan_weight=partisan_weight,
                 vra_compliance=self.vra_compliance,
                 communities_of_interest=coi_list,
-                target_party=target_party
+                target_party=target_party,
+                random_seed=0,
             )
-            algorithm.progress_update.connect(self._emit_progress)
+            result = solver.solve()
 
-            if "Divide and Conquer" in self.algorithm_name:
-                districts_list = algorithm.divide_and_conquer()
-            else:
-                districts_list = algorithm.gerrymander()
-
-            self._emit_finished(districts_list)
+            self._emit_progress(100)
+            self._emit_finished(result.districts)
         except Exception as e:
             self._emit_error(str(e))
