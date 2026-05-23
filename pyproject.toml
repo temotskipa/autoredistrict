@@ -15,7 +15,7 @@ dependencies = [
     "shapely",
     "us",
     "pydataverse",
-    "PyYAML",
+    "pyyaml",
     "ttkbootstrap",
     "uvicorn[standard]",
 ]
