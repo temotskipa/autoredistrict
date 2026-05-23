@@ -10,7 +10,7 @@ dependencies = [
     "matplotlib",
     "numpy",
     "pandas",
-    "pandas-stubs>=2.0.0",
+    "pandas-stubs>=3.0.0.260204",
     "requests",
     "shapely",
     "us",
