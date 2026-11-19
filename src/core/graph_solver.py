@@ -18,8 +18,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 
-from .redistricting_algorithms import _polsby_popper_static, _weighted_partisan_share
-from .utils import build_adjacency, is_contiguous
+from .utils import build_adjacency, is_contiguous, polsby_popper, weighted_partisan_share
 
 
 @dataclass(frozen=True)
@@ -671,7 +670,7 @@ class GraphRedistrictingSolver:
                 else 0.0
             )
             deviations.append(deviation)
-            compactness_scores.append(float(_polsby_popper_static(district)))
+            compactness_scores.append(float(polsby_popper(district)))
             partisan_penalties.append(self._partisan_penalty(self._nodes_for_district(assignment, district_id)))
             if not self._assignment_is_contiguous(assignment, district_id):
                 noncontiguous_penalties += 1000.0
@@ -872,7 +871,7 @@ class GraphRedistrictingSolver:
 
     def _compactness_for_nodes(self, nodes: Iterable[int]) -> float:
         district = self.metric_gdf.iloc[list(nodes)]
-        return float(_polsby_popper_static(district))
+        return float(polsby_popper(district))
 
     def _centering_score(self, assignment: Sequence[int]) -> float:
         scores = []
@@ -899,12 +898,12 @@ class GraphRedistrictingSolver:
 
     def _partisan_penalty(self, nodes: Iterable[int]) -> float:
         district = self.gdf.iloc[list(nodes)]
-        share = _weighted_partisan_share(district)
+        share = weighted_partisan_share(district)
         if self.target_party == 1:
             return abs(share - 0.55) if share >= 0.5 else (0.5 - share) + 0.25
         if self.target_party == 0:
             return abs(share - 0.45) if share <= 0.5 else (share - 0.5) + 0.25
-        return abs(share - _weighted_partisan_share(self.gdf))
+        return abs(share - weighted_partisan_share(self.gdf))
 
     def _coi_assignment_penalty(self, assignment: Sequence[int]) -> float:
         if not self.communities_of_interest:

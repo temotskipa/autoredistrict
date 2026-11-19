@@ -1,99 +1,107 @@
-# Congressional Redistricting Application
+# Autoredistrict
 
-Autoredistrict is a local-first congressional redistricting workbench. It can generate reproducible district plans from synthetic demo geography or live Census/TIGER state data, score the plans with district metrics, and export map and data artifacts for inspection.
+Autoredistrict is a local-first congressional redistricting workbench. It fetches Census and TIGER geography for a state, generates district plans under population, compactness, VRA, community-of-interest, and partisan criteria, scores them, and exports maps and data for inspection.
 
-## Features
+## Status
 
-- **Automatic Redistricting:** Generate congressional district maps from demo or live state geography.
-- **Graph Solver:** Build contiguous districts over an adjacency graph with deterministic multi-start growth, local boundary moves, annealing, and adjacent-pair recombination.
-- **Multiple Algorithms:** Choose a fair baseline or Democratic/Republican advantage modes.
-- **Customizable Criteria:** Adjust parameters like population equality and compactness.
-- **VRA and COI Heuristics:** Enable Voting Rights Act opportunity-district scoring and preserve communities of interest by GEOID.
-- **Data Fetching:** Automatically fetches the latest census data and shapefiles.
-- **Local Web/API Mode:** Run a FastAPI server with a browser UI for generating and reviewing plans.
-- **Export Options:** Export PNG maps, dissolved GeoJSON, unit assignment CSV, metrics CSV, JSON reports, and optional shapefiles.
+- **Works today:** synthetic demo grids run end to end through the web UI, the API, and the CLI, producing a full artifact bundle (PNG map, GeoJSON, assignment CSV, metrics CSV, JSON report).
+- **Not yet practical:** real states. The current graph solver (`src/core/graph_solver.py`) recomputes polygon geometry for every candidate move, so a 100-unit grid already takes about a minute. A state at tract level has thousands of units. Replacing the solver core is the next milestone (see [Roadmap](#roadmap)).
 
-## Setup and Installation
+## Setup
 
-1. **Clone the repository:**
-
-    ```bash
-    git clone <repository_url>
-    cd <repository_directory>
-    ```
-
-2. **Install the dependencies:**
-    Make sure you have Python 3 installed. Then, run the following command to install the necessary libraries:
-
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-## How to Run
-
-To run the legacy desktop application, execute the `src.app` module:
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.14.
 
 ```bash
-python -m src.app
+uv sync
 ```
 
-This will open the main application window, where you can select a state, choose an algorithm, and generate a district map.
-
-### Local Web Interface
-
-The browser-based local interface is the preferred path for ongoing development and automated testing:
+## Web interface
 
 ```bash
 uv run python -m src.webapp
 ```
 
-Then open <http://127.0.0.1:8765>. The current web UI runs the graph-based synthetic demo solver by default, can request a live state run with a Census API key, displays the generated map and district metrics, and exposes PNG, GeoJSON, assignment CSV, metrics CSV, and JSON report artifacts.
+Then open <http://127.0.0.1:8765>. The UI runs the synthetic demo solver by default and can request a live state run with a Census API key.
 
-Useful API routes:
+API routes:
 
 - `GET /api/health`
 - `POST /api/plans/demo`
 - `POST /api/plans/state`
 - `GET /api/plans/{plan_id}`
 
-### Headless CLI (no GUI required)
+Artifacts are written to `.cache/web/plans/<plan_id>/`.
 
-For quick smoke tests or server use, run the CLI:
+## Command line
 
-```bash
-python -m src.cli <state> --api-key $CENSUS_API_KEY --map-out map.png --shp-out districts.shp
-```
-
-To exercise the pipeline without network/API keys, use the synthetic demo dataset:
+Demo data, no network or API key needed:
 
 ```bash
-python -m src.cli demo --demo --districts 4 --seed 11 --map-out demo.png --report-out plan.json
+uv run python -m src.cli --mode demo --districts 4 --seed 11 --map-out demo.png --report-out plan.json
 ```
 
-For faster but lower-fidelity runs, use tract resolution:
+Smoke run with built-in assertions (contiguity, population deviation, COI preservation):
 
 ```bash
-python -m src.cli "North Carolina" --api-key $CENSUS_API_KEY --resolution tract
+uv run python -m src.cli --mode smoke --map-out smoke.png --quiet
 ```
 
-To prefetch and cache data/shapefiles only (no map generation):
+Live state data (tract resolution is faster; `block` is the default):
 
 ```bash
-python -m src.cli "North Carolina" --api-key $CENSUS_API_KEY --cache-only
+uv run python -m src.cli "North Carolina" --mode live --api-key $CENSUS_API_KEY --resolution tract
 ```
 
-For a no-network smoke run with assertions:
+Prefetch and cache Census data and shapefiles without solving:
 
 ```bash
-uv run python -m src.cli --demo --mode smoke --map-out smoke.png --quiet
+uv run python -m src.cli "North Carolina" --mode live --api-key $CENSUS_API_KEY --cache-only
 ```
 
-## Verification
+### Without census.gov
 
-Run the automated test suite:
+census.gov blocks some regions, so neither the Census API nor the TIGER shapefile downloads work there. [Redistricting Data Hub](https://redistrictingdatahub.org/) republishes the same 2020 P.L. 94-171 counts joined to Census geometry, and a free account can download them. Download a state's PL 94-171 file in shapefile form, for example `me_pl2020_t.zip` for tracts or `me_pl2020_b.zip` for blocks, then import it:
 
 ```bash
-uv run --frozen pytest
+uv run python -m src.cli --import-rdh me_pl2020_t.zip
 ```
 
-The current tests cover API health and artifact serving, demo plan generation, mocked live-state solving, deterministic graph-solver behavior, contiguity, VRA/COI heuristics, recombination population-balance improvement, and CLI report/map output.
+The importer reads the state and resolution from the GEOIDs and writes the same cache files a live fetch would. After that, live runs for that state need no API key and make no request to census.gov, in both the CLI and the web UI:
+
+```bash
+uv run python -m src.cli ME --mode live --resolution tract
+```
+
+If you download RDH's CSV version instead, pass a boundary shapefile for the same geography along with it.
+
+Run `uv run python -m src.cli --help` for every option, including `--vra`, `--coi-csv`, `--algorithm`, and `--shp-out`.
+
+## Tests
+
+```bash
+uv run pytest
+```
+
+The suite takes a few minutes, almost all of it in solver runs on small grids.
+
+## Project layout
+
+| Path | Purpose |
+|---|---|
+| `src/api.py`, `src/webapp.py`, `src/web/` | FastAPI app, server entry point, browser UI |
+| `src/cli.py` | Headless CLI and smoke harness |
+| `src/services/redistricting_service.py` | Shared pipeline: data prep, solve, metrics, artifacts. Both front ends go through it. |
+| `src/core/graph_solver.py` | Current district solver (multi-start growth, boundary annealing, pair recombination) |
+| `src/core/apportionment.py` | Huntington-Hill apportionment |
+| `src/core/utils.py` | Adjacency, contiguity, compactness, partisan share helpers |
+| `src/data/census_fetcher.py` | Census API and TIGER shapefile download with caching |
+| `src/data/data_fetcher.py` | Statewide populations for apportionment |
+| `src/data/partisan_*.py`, `data/provider_sources.yaml` | Election-return providers for partisan scores |
+| `src/rendering/map_generator.py` | Map PNG and shapefile export |
+| `tools/generate_providers.py` | Regenerates provider metadata from OpenElections |
+
+## Roadmap
+
+1. Replace the solver core with a ReCom-based engine that keeps district totals in arrays and scores moves incrementally, without polygon unions inside the loop.
+2. Run a real state end to end at tract level, then at block level.
+3. Improve partisan data resolution. Scores are currently county-level, applied uniformly to every tract or block in a county.

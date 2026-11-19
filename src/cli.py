@@ -2,8 +2,8 @@
 """
 Headless CLI runner for the redistricting pipeline.
 
-Outputs key plan metrics and saves the rendered map and shapefile so
-results can be inspected without launching the Qt GUI.
+Outputs key plan metrics and saves the rendered map, report, and optional
+shapefile so results can be inspected without the web UI.
 """
 import argparse
 import json
@@ -15,35 +15,38 @@ from datetime import datetime
 from typing import List, Tuple
 
 import geopandas as gpd
-import numpy as np
 import pandas as pd
 import us
-from shapely.geometry import box
 
 from .core.apportionment import calculate_apportionment
-from .core.redistricting_algorithms import (
-    RedistrictingAlgorithm,
-    _polsby_popper_static,
-    _weighted_partisan_share,
+from .data.census_fetcher import (
+    DataFetcherWorker,
+    has_cached_census_data,
+    record_cache_index,
 )
-from .core.utils import is_contiguous
 from .data.data_fetcher import DataFetcher
+from .data.rdh_import import RdhImportError, import_rdh_files
 from .rendering.map_generator import MapGenerator
-from .services.redistricting_service import solve_geodata_plan
-from .workers.data_worker import DataFetcherWorker
+from .services.redistricting_service import (
+    approximate_district_count,
+    build_demo_dataset,
+    merge_census_geodata,
+    normalize_state_fips,
+    solve_geodata_plan,
+)
+
+
+DEMO_STATE_FIPS = "00"
 
 
 def _state_fips(arg: str) -> str:
     """Return 2-digit state FIPS from name/abbr/fips input."""
-    arg = arg.strip()
-    if arg.lower() == "demo":
-        return "00"
-    if arg.isdigit():
-        return arg.zfill(2)
-    state = us.states.lookup(arg)
-    if not state:
-        raise argparse.ArgumentTypeError(f"Unrecognized state: {arg}")
-    return state.fips
+    if arg.strip().lower() == "demo":
+        return DEMO_STATE_FIPS
+    try:
+        return normalize_state_fips(arg)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(str(exc)) from exc
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -116,8 +119,17 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--resolution",
         choices=["block", "tract"],
-        default="block",
-        help="Spatial resolution for Census/shapefiles. 'tract' is faster but lower fidelity.",
+        default=None,
+        help="Spatial resolution for Census/shapefiles (default: block). "
+             "'tract' is faster but lower fidelity.",
+    )
+    parser.add_argument(
+        "--import-rdh",
+        nargs="+",
+        metavar="PATH",
+        help="Import Redistricting Data Hub 2020 PL 94-171 downloads (zip, folder, "
+             "shapefile or CSV) into the cache and exit. State and resolution are "
+             "read from the files. Imported states run without a Census API key.",
     )
     parser.add_argument(
         "--cache-only",
@@ -161,76 +173,6 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _demo_dataset(size=4, rich=False):
-    """
-    Return a synthetic GeoDataFrame for smoke tests.
-    rich=True produces higher minority share and designated COI cells.
-    """
-    records = []
-    base_pop = 1000
-    for i in range(size):
-        for j in range(size):
-            geoid = f"000{i:02d}{j:02d}"
-            geom = box(i, j, i + 1, j + 1)
-            pop = base_pop + (i * size + j) * 25
-            # richer scenario: majority-minority overall
-            if rich:
-                minority = pop * (0.55 if (i + j) % 3 == 0 else 0.35)
-            else:
-                minority = pop * 0.4 if (i + j) % 2 == 0 else pop * 0.2
-            partisan = 0.3 if i < (size / 2) else 0.7  # left half leans D, right half leans R
-            records.append(
-                {
-                    "GEOID": geoid,
-                    "state": "00",
-                    "county": f"{i:03d}",
-                    "tract": f"{j:06d}",
-                    "P1_001N": pop,
-                    "P1_003N": pop - minority,  # non-Hisp white approx
-                    "partisan_score": partisan,
-                    "geometry": geom,
-                }
-            )
-    gdf = gpd.GeoDataFrame(records, geometry="geometry", crs="EPSG:4326")
-    return gdf
-
-
-def _merge_data(shapefile_path: str, census_df: pd.DataFrame) -> gpd.GeoDataFrame:
-    state_gdf = gpd.read_file(shapefile_path)
-    if "GEOID" in state_gdf.columns:
-        pass  # GEOID is already present
-    elif "GEOID20" in state_gdf.columns:
-        state_gdf["GEOID"] = state_gdf["GEOID20"]
-    else:
-        raise RuntimeError("Shapefile missing GEOID/GEOID20 field.")
-
-    merged = state_gdf.merge(census_df, on="GEOID")
-
-    if "partisan_score" not in merged.columns:
-        merged["partisan_score"] = 0.5
-    merged["partisan_score"] = pd.to_numeric(
-        merged["partisan_score"], errors="coerce"
-    )
-    fallback = merged["partisan_score"].mean()
-    if pd.isna(fallback):
-        fallback = 0.5
-    merged["partisan_score"] = merged["partisan_score"].fillna(fallback)
-    return merged
-
-
-def _compute_metrics(districts: List[gpd.GeoDataFrame]) -> List[Tuple]:
-    all_pop = sum(d["P1_001N"].sum() for d in districts)
-    ideal = all_pop / len(districts) if districts else 0
-    metrics = []
-    for idx, gdf in enumerate(districts):
-        pop = gdf["P1_001N"].sum()
-        dev_pct = 0 if ideal == 0 else ((pop - ideal) / ideal) * 100
-        compact = _polsby_popper_static(gdf)
-        partisan = _weighted_partisan_share(gdf)
-        metrics.append((idx, pop, dev_pct, compact, partisan))
-    return metrics
-
-
 def _print_metrics(metrics: List[Tuple]):
     if not metrics:
         print("No districts produced.")
@@ -269,19 +211,41 @@ def main(argv=None):
 
     logging.basicConfig(level=logging.INFO if not args.quiet else logging.WARNING, format="%(levelname)s: %(message)s")
 
+    requested_resolution = args.resolution
+    args.resolution = args.resolution or "block"
+
+    if args.import_rdh:
+        try:
+            results = import_rdh_files(
+                args.import_rdh,
+                state_fips=None if args.state == DEMO_STATE_FIPS else args.state,
+                resolution=requested_resolution,
+            )
+        except RdhImportError as exc:
+            parser.error(str(exc))
+        for item in results:
+            print(
+                f"Imported state {item.state_fips} at {item.resolution} level: "
+                f"{item.rows} units, population {item.total_population:,}."
+            )
+        return
+
     # Determine data mode
     demo_mode = args.demo or args.mode == "demo"
     live_mode = args.mode == "live"
-    if live_mode and not args.api_key:
-        parser.error("Census API key is required for live mode (--api-key or CENSUS_API_KEY).")
+    if live_mode and not args.api_key and not has_cached_census_data(args.state, args.resolution):
+        parser.error(
+            f"No cached Census data for state {args.state} at {args.resolution} level. "
+            "Pass a Census API key (--api-key or CENSUS_API_KEY), or import "
+            "Redistricting Data Hub files with --import-rdh."
+        )
 
     # In smoke mode, prefer a real small state; require cache unless explicitly allowed to demo
-    if args.mode == "smoke" and args.state == "demo":
+    # argparse runs the default "demo" through _state_fips, so compare FIPS.
+    if args.mode == "smoke" and args.state == DEMO_STATE_FIPS:
         args.state = us.states.ME.fips  # Maine (2 districts), small geography
         args.resolution = "tract"
-        cache_parquet = os.path.join(".cache", f"census_{args.state}_{args.resolution}.parquet")
-        cache_csv = os.path.join(".cache", f"census_{args.state}_{args.resolution}.csv")
-        if os.path.exists(cache_parquet) or os.path.exists(cache_csv):
+        if has_cached_census_data(args.state, args.resolution):
             demo_mode = False
         else:
             if args.smoke_allow_demo:
@@ -292,19 +256,18 @@ def main(argv=None):
                 demo_mode = True
 
     if demo_mode:
-        merged_gdf = _demo_dataset(rich=True)
+        merged_gdf = build_demo_dataset(size=4, rich=True)
         shapefile_path = None
     else:
         provider_keys = [args.provider] if args.provider else None
-        worker = DataFetcherWorker(
-            args.state,
-            args.api_key,
-            election_year=args.election_year,
-            provider_keys=provider_keys,
-            resolution=args.resolution,
-        )
-
         try:
+            worker = DataFetcherWorker(
+                args.state,
+                args.api_key,
+                election_year=args.election_year,
+                provider_keys=provider_keys,
+                resolution=args.resolution,
+            )
             print("Fetching census data and shapefiles (may take a few minutes)...")
             census_df = worker._get_census_data(args.state)
             if census_df is None:
@@ -313,7 +276,7 @@ def main(argv=None):
             if not shapefile_path:
                 raise RuntimeError("Failed to fetch shapefiles.")
 
-            merged_gdf = _merge_data(shapefile_path, census_df)
+            merged_gdf = merge_census_geodata(shapefile_path, census_df)
 
             if args.cache_only:
                 total_pop = census_df["P1_001N"].sum() if "P1_001N" in census_df else None
@@ -326,24 +289,13 @@ def main(argv=None):
                     "created_at": datetime.utcnow().isoformat() + "Z",
                     "provider_keys": provider_keys,
                 }
-                os.makedirs(".cache", exist_ok=True)
-                index_path = ".cache/cache_index.json"
-                try:
-                    with open(index_path, "r") as fp:
-                        idx = json.load(fp)
-                except Exception:
-                    idx = []
-                idx = [m for m in idx if
-                       not (m.get("state_fips") == args.state and m.get("resolution") == args.resolution)]
-                idx.append(meta)
-                with open(index_path, "w") as fp:
-                    json.dump(idx, fp, indent=2)
+                record_cache_index(meta)
                 print(f"Cache populated for state {args.state} at {args.resolution} resolution.")
                 return
         except Exception as exc:
             if args.mode == "smoke":
                 print(f"Smoke: live fetch failed ({exc}); falling back to demo dataset.")
-                merged_gdf = _demo_dataset(rich=True)
+                merged_gdf = build_demo_dataset(size=4, rich=True)
                 demo_mode = True
             else:
                 parser.error(str(exc))
@@ -361,9 +313,7 @@ def main(argv=None):
             except Exception:
                 num_districts = None
     if num_districts is None:
-        total_pop = merged_gdf["P1_001N"].sum()
-        # Fallback: approximate seats by 760k ideal population per district.
-        num_districts = max(1, round(total_pop / 760_000))
+        num_districts = approximate_district_count(merged_gdf, args.state)
 
     print(f"Running graph solver for {num_districts} districts...")
     result = solve_geodata_plan(

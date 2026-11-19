@@ -85,7 +85,7 @@ function readPayload(data) {
   }
   if (data.get("mode") === "state") {
     payload.state = data.get("state");
-    payload.api_key = data.get("api_key");
+    payload.api_key = data.get("api_key") || null;
     payload.resolution = data.get("resolution");
     delete payload.grid_size;
     delete payload.preserve_demo_coi;

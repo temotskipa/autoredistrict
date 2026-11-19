@@ -3,7 +3,12 @@ from pathlib import Path
 import pandas as pd
 
 from src.services import redistricting_service
-from src.services.redistricting_service import DemoPlanRequest, normalize_state_fips, run_demo_plan
+from src.services.redistricting_service import (
+    DemoPlanRequest,
+    approximate_district_count,
+    normalize_state_fips,
+    run_demo_plan,
+)
 
 
 def test_run_demo_plan_writes_artifacts(tmp_path: Path):
@@ -61,6 +66,26 @@ def test_normalize_state_fips_accepts_name_abbr_and_fips():
     assert normalize_state_fips("ME") == "23"
     assert normalize_state_fips("Maine") == "23"
     assert normalize_state_fips("23") == "23"
+
+
+def test_approximate_district_count_uses_official_table():
+    # Populations around 1.09M round to 1 under pop / 760_000, but MT and RI have 2 seats.
+    mt_data = pd.DataFrame({"P1_001N": [540_000, 544_225]})
+    ri_data = pd.DataFrame({"P1_001N": [550_000, 548_163]})
+
+    assert approximate_district_count(mt_data, "30") == 2
+    assert approximate_district_count(ri_data, "44") == 2
+
+
+def test_approximate_district_count_falls_back_to_estimate_outside_table():
+    pr_data = pd.DataFrame({"P1_001N": [1_600_000, 1_600_000]})
+    dc_data = pd.DataFrame({"P1_001N": [689_545]})
+    demo_data = pd.DataFrame({"P1_001N": [1_600_000]})
+
+    assert approximate_district_count(pr_data, "72") == 4
+    assert approximate_district_count(dc_data, "11") == 1
+    assert approximate_district_count(demo_data, "00") == 2
+    assert approximate_district_count(pr_data) == 4
 
 
 def test_run_state_plan_uses_fetcher_and_writes_artifacts(tmp_path: Path, monkeypatch):
