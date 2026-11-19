@@ -48,7 +48,7 @@ class DemoPlanPayload(BaseModel):
 
 class StatePlanPayload(BaseModel):
     state: str = Field(min_length=2, max_length=32)
-    api_key: str = Field(min_length=1)
+    api_key: str | None = None  # optional for states already in the local cache
     districts: int | None = Field(default=None, ge=1, le=100)
     algorithm: Literal["fair", "gerrymander", "gerrymander_dem", "gerrymander_rep"] = "fair"
     population_equality_weight: float = Field(default=1.0, ge=0.0, le=1.0)

@@ -147,8 +147,7 @@ def _fetch_medsl_state_returns(state_fips: str, _unused_year: Optional[int]) -> 
     grouped['total'] = grouped.sum(axis=1)
     grouped = grouped[grouped['total'] > 0]
     grouped['partisan_score'] = grouped['DEMOCRAT'] / grouped['total']
-    result = grouped[['partisan_score']].reset_index()
-    result.rename(columns={'county_fips': 'county'}, inplace=True)
+    result = grouped[['partisan_score']].reset_index().rename(columns={'county_fips': 'county'})
     result['county'] = result['county'].astype(str).str.zfill(3)
     return result
 

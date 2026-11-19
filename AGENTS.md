@@ -1,38 +1,36 @@
 # Agent Guidance
 
-This document provides guidance for AI agents working on this project.
+## Project overview
 
-## Project Overview
+Autoredistrict is a local-first congressional redistricting workbench written in Python. It has two front ends, a FastAPI web app with a browser UI and a headless CLI. Both run the same pipeline in `src/services/redistricting_service.py`. Geographic data is handled with GeoPandas and Shapely.
 
-This project is a congressional redistricting application that automatically generates district maps based on user-provided criteria. The application is built using Python, with PyQt5 for the GUI and GeoPandas for geographic data manipulation.
+## Key modules
 
-## Key Modules
+- `src/api.py`: FastAPI routes; serves the UI from `src/web/` and plan artifacts from `.cache/web/plans/`.
+- `src/webapp.py`: uvicorn entry point (`python -m src.webapp`).
+- `src/cli.py`: CLI entry point (`python -m src.cli`), including `demo`, `smoke`, and `live` modes.
+- `src/services/redistricting_service.py`: demo dataset, Census/TIGER merge, solve, metrics, warnings, artifact writing. New features belong here, not in a front end.
+- `src/core/graph_solver.py`: `GraphRedistrictingSolver`, the current solver.
+- `src/core/utils.py`: adjacency, contiguity, Polsby-Popper, and population-weighted partisan share.
+- `src/core/apportionment.py`: Huntington-Hill apportionment.
+- `src/data/census_fetcher.py`: `DataFetcherWorker`, which downloads Census P1 data and TIGER shapefiles with retries and caching under `.cache/`. It creates the Census client only when a download needs it, so cached states run without an API key.
+- `src/data/rdh_import.py`: imports Redistricting Data Hub PL 94-171 downloads into that same cache, for places where census.gov is blocked (`python -m src.cli --import-rdh <zip>`).
+- `src/data/partisan_providers.py`, `src/data/partisan_data.py`: election-return providers, registered from `data/provider_sources.yaml`.
+- `src/rendering/map_generator.py`: map PNG and shapefile export.
 
--   **`main.py`:** The main entry point of the application. It contains the `MainWindow` class, which defines the GUI and orchestrates the overall workflow.
--   **`data_fetcher.py`:** This module is responsible for fetching the initial state population data for apportionment calculations.
--   **`redistricting_algorithms.py`:** This module contains the implementation of the redistricting algorithms, including the "Divide and Conquer" algorithm and the gerrymandering algorithm.
--   **`map_generator.py`:** This module is responsible for generating map images and exporting district data to shapefiles.
--   **`apportionment.py`:** This module contains the logic for the Huntington-Hill apportionment method.
--   **`worker.py`:** This module contains the `DataFetcherWorker` class, which runs the data fetching process in a separate `QThread` to prevent the GUI from freezing.
--   **`redistricting_worker.py`:** This module contains the `RedistrictingWorker` class, which runs the redistricting algorithm in a separate `QThread`.
+## Development guidelines
 
-## Development Guidelines
+- Use uv: `uv sync`, then `uv run pytest`. Tests live in `tests/` and must pass before a change is done.
+- Follow PEP 8.
+- Keep front ends thin. Logic shared by the web app and the CLI goes in the service layer.
+- Handle network and file errors explicitly. Census and TIGER downloads fail intermittently.
 
--   **Code Style:** Please follow the PEP 8 style guide for Python code.
--   **Modularity:** Keep the code modular and well-organized. Each module should have a clear and specific purpose.
--   **Error Handling:** Implement robust error handling, especially for network requests and file operations.
--   **Testing:** While there are no automated tests at the moment, it is highly encouraged to add them in the future.
+## Known limitations
 
-## Implemented Enhancements
+- The graph solver does not scale. It rebuilds GeoDataFrames and runs polygon unions for every scored move, so runtime grows quickly with unit count. Replacing it is the top priority.
+- Partisan scores are county-level and applied uniformly to every tract or block in a county.
 
--   **Huntington-Hill Apportionment:** The application now allows users to set the total size of the U.S. House of Representatives and uses the Huntington-Hill method to apportion districts to each state.
--   **VRA Compliance Logic:** The VRA compliance logic has been implemented in the redistricting algorithms to prevent the "cracking" of minority communities.
--   **Enhanced Gerrymandering Algorithm:** The gerrymandering algorithm has been enhanced to use a partisan score to create a partisan advantage.
--   **Support for Communities of Interest:** The application now supports the preservation of communities of interest by allowing users to upload a CSV file of GEOIDs.
--   **Expanded State List:** The state selection dropdown is now populated with a complete list of US states.
--   **Performance Optimization:** The redistricting algorithm has been parallelized to improve performance on multi-core systems.
--   **Progress Bar:** A progress bar has been added to the GUI to provide feedback during the data fetching and redistricting processes.
+## API usage notes
 
-## API Usage Notes
-
--   **Census API for Block-Level Data:** When fetching block-level data from the Census API, it is required to specify both the state and county FIPS codes. A request for all blocks within a state will not work without also specifying a county.
+- Census API block-level requests must specify both state and county FIPS codes. A request for all blocks in a state without a county fails.
+- census.gov (the API, `www2` TIGER downloads and the website) returns Cloudflare 403 pages from some regions, including the user's. Don't assume live fetches work; prefer cached or imported data in tests and checks.

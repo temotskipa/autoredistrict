@@ -76,10 +76,14 @@ def test_missing_plan_returns_404():
     assert response.status_code == 404
 
 
-def test_state_plan_endpoint_requires_api_key():
+def test_state_plan_endpoint_needs_api_key_when_state_not_cached(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # empty cache
+
     response = client.post(
         "/api/plans/state",
         json={"state": "ME", "districts": 2, "algorithm": "fair"},
     )
 
-    assert response.status_code == 422
+    assert response.status_code == 400
+    assert "Census API key" in response.json()["detail"]
+    assert "--import-rdh" in response.json()["detail"]

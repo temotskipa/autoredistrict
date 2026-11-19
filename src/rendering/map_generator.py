@@ -30,8 +30,7 @@ class MapGenerator:
         weighted_den = work["__pop"].groupby(work["district_id"]).sum().replace({0: pd.NA})
         weighted = (weighted_num / weighted_den).fillna(0.5)
         dissolved["partisan_score"] = weighted.reindex(dissolved.index).values
-        dissolved.reset_index(inplace=True)
-        return dissolved
+        return dissolved.reset_index()
 
     def generate_map_image(self, output_path):
         """

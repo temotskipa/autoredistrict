@@ -1,4 +1,5 @@
 import concurrent.futures
+import json
 import logging
 import os
 import random
@@ -12,11 +13,68 @@ import pandas as pd
 import requests
 from census import Census
 
-from ..data.partisan_providers import (
+from .partisan_providers import (
     DEFAULT_PARTISAN_YEAR,
     PROVIDER_REGISTRY,
     fetch_scores_for_provider,
 )
+
+CACHE_DIR = ".cache"
+# Written next to geometry that came from an import rather than TIGER; names
+# the geometry file and tells the fetcher not to check census.gov for updates.
+IMPORT_MANIFEST = "source.json"
+
+
+def census_cache_paths(state_fips, resolution, cache_dir=CACHE_DIR):
+    """Return the (csv, parquet) paths that cache one state's Census counts."""
+    base = os.path.join(cache_dir, f"census_{state_fips}_{resolution}")
+    return f"{base}.csv", f"{base}.parquet"
+
+
+def shapefile_cache_dir(state_fips, resolution, cache_dir=CACHE_DIR):
+    return os.path.join(cache_dir, f"shapefiles_{state_fips}_{resolution}")
+
+
+def has_cached_census_data(state_fips, resolution, cache_dir=CACHE_DIR) -> bool:
+    """True when Census counts are cached, so no API key is needed.
+
+    Geometry isn't checked: TIGER downloads don't need a key.
+    """
+    return any(os.path.exists(path) for path in census_cache_paths(state_fips, resolution, cache_dir))
+
+
+def imported_geometry_path(shapefile_dir) -> Optional[str]:
+    """Return the geometry file an import manifest names, if it exists."""
+    manifest_path = os.path.join(shapefile_dir, IMPORT_MANIFEST)
+    try:
+        with open(manifest_path, "r", encoding="utf-8") as fp:
+            manifest = json.load(fp)
+    except (OSError, ValueError):
+        return None
+    geometry = manifest.get("geometry")
+    if not geometry:
+        return None
+    path = os.path.join(shapefile_dir, geometry)
+    return path if os.path.exists(path) else None
+
+
+def record_cache_index(meta, cache_dir=CACHE_DIR):
+    """Add or replace a state/resolution entry in the cache index."""
+    os.makedirs(cache_dir, exist_ok=True)
+    index_path = os.path.join(cache_dir, "cache_index.json")
+    try:
+        with open(index_path, "r", encoding="utf-8") as fp:
+            index = json.load(fp)
+    except (OSError, ValueError):
+        index = []
+    index = [
+        entry for entry in index
+        if not (entry.get("state_fips") == meta.get("state_fips")
+                and entry.get("resolution") == meta.get("resolution"))
+    ]
+    index.append(meta)
+    with open(index_path, "w", encoding="utf-8") as fp:
+        json.dump(index, fp, indent=2)
 
 
 class DataFetcherWorker:
@@ -36,7 +94,7 @@ class DataFetcherWorker:
     ):
         self.state_fips = state_fips
         self.api_key = api_key
-        self.c = Census(self.api_key)
+        self._census: Optional[Census] = None
         self.election_year = election_year or DEFAULT_PARTISAN_YEAR
         self.provider_keys = provider_keys or ["county_presidential"]
         self.active_provider_meta = None
@@ -45,6 +103,17 @@ class DataFetcherWorker:
         self.progress_callback = progress_callback
         self.finished_callback = finished_callback
         self.error_callback = error_callback
+
+    @property
+    def c(self) -> Census:
+        """Census API client, created on first use.
+
+        The census library refuses to build a client without an API key, so
+        creating it lazily lets cached runs work without one.
+        """
+        if self._census is None:
+            self._census = Census(self.api_key)
+        return self._census
 
     # ------------- event helpers ------------- #
     def _emit_progress(self, value: int):
@@ -70,10 +139,8 @@ class DataFetcherWorker:
 
     # ------------- cache helpers ------------- #
     def _cache_paths(self, state_fips):
-        cache_dir = ".cache"
-        os.makedirs(cache_dir, exist_ok=True)
-        base = os.path.join(cache_dir, f"census_{state_fips}_{self.resolution}")
-        return f"{base}.csv", f"{base}.parquet"
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        return census_cache_paths(state_fips, self.resolution)
 
     def _load_cache(self, state_fips):
         csv_path, parquet_path = self._cache_paths(state_fips)
@@ -86,7 +153,9 @@ class DataFetcherWorker:
                 self.logger.warning(f"Failed to read parquet cache {parquet_path}: {exc}")
         if os.path.exists(csv_path):
             try:
-                df = pd.read_csv(csv_path, dtype={'GEOID': str, 'county': str})
+                # Keep FIPS codes as text so leading zeros survive.
+                fips_columns = ('GEOID', 'state', 'county', 'tract', 'block')
+                df = pd.read_csv(csv_path, dtype={column: str for column in fips_columns})
                 self.logger.info(f"Loading census data from cache: {csv_path}")
                 return df
             except Exception as exc:
@@ -253,10 +322,16 @@ class DataFetcherWorker:
             return df
 
     def _get_shapefiles(self, state_fips):
-        cache_dir = ".cache"
         suffix = "tract" if self.resolution == "tract" else "tabblock20"
         base_folder = "TRACT" if self.resolution == "tract" else "TABBLOCK20"
-        shapefile_dir = os.path.join(cache_dir, f"shapefiles_{state_fips}_{self.resolution}")
+        shapefile_dir = shapefile_cache_dir(state_fips, self.resolution)
+
+        imported = imported_geometry_path(shapefile_dir)
+        if imported:
+            self.logger.info(f"Using imported geometry: {imported}")
+            self._emit_progress(100)
+            return imported
+
         shapefile_base = f"tl_2024_{state_fips}_{suffix}"
         shapefile_path = os.path.join(shapefile_dir, f"{shapefile_base}.shp")
         base_url = f"https://www2.census.gov/geo/tiger/TIGER2024/{base_folder}/"
@@ -265,7 +340,7 @@ class DataFetcherWorker:
 
         if os.path.exists(shapefile_dir):
             try:
-                response = requests.head(url)
+                response = requests.head(url, timeout=30)
                 response.raise_for_status()
                 last_modified_header = response.headers.get('Last-Modified')
                 if last_modified_header:
@@ -287,7 +362,8 @@ class DataFetcherWorker:
 
         try:
             self.logger.info(f"Downloading shapefile from {url}")
-            response = self.c.session.get(url)
+            # TIGER downloads need no API key, so skip the Census client here.
+            response = requests.get(url, timeout=120)
             response.raise_for_status()
             with open(filename, 'wb') as f:
                 f.write(response.content)

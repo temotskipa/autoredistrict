@@ -1,1 +1,1 @@
-"""Application services shared by CLI, API, and desktop entrypoints."""
+"""Application services shared by the CLI and web API entrypoints."""

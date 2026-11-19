@@ -18,11 +18,11 @@ import pandas as pd
 import us
 from shapely.geometry import box
 
+from ..core.apportionment import get_apportioned_seats
 from ..core.graph_solver import GraphRedistrictingSolver
-from ..core.redistricting_algorithms import _polsby_popper_static, _weighted_partisan_share
-from ..core.utils import is_contiguous
+from ..core.utils import is_contiguous, polsby_popper, weighted_partisan_share
+from ..data.census_fetcher import DataFetcherWorker, has_cached_census_data
 from ..rendering.map_generator import MapGenerator
-from ..workers.data_worker import DataFetcherWorker
 
 ARTIFACT_ROOT = Path(".cache") / "web" / "plans"
 
@@ -42,7 +42,7 @@ class DemoPlanRequest:
 @dataclass(frozen=True)
 class StatePlanRequest:
     state: str
-    api_key: str
+    api_key: Optional[str]  # needed only when the state's Census data isn't cached
     districts: Optional[int] = None
     algorithm: str = "fair"
     population_equality_weight: float = 1.0
@@ -119,9 +119,13 @@ def run_state_plan(
 ) -> Dict[str, Any]:
     """Fetch state data and run the graph solver through the shared pipeline."""
     state_fips = normalize_state_fips(request.state)
-    if not request.api_key:
-        raise ValueError("A Census API key is required for live state plans.")
     resolution = request.resolution if request.resolution in {"tract", "block"} else "tract"
+    if not request.api_key and not has_cached_census_data(state_fips, resolution):
+        raise ValueError(
+            f"No cached Census data for state {state_fips} at {resolution} level. "
+            "Enter a Census API key, or import Redistricting Data Hub files with "
+            "`python -m src.cli --import-rdh <download>`."
+        )
 
     worker = DataFetcherWorker(
         state_fips,
@@ -140,7 +144,7 @@ def run_state_plan(
     state_data = merge_census_geodata(shapefile_path, census_df)
     if state_data.empty:
         raise RuntimeError("No Census rows matched the shapefile GEOIDs.")
-    district_count = request.districts or approximate_district_count(state_data)
+    district_count = request.districts or approximate_district_count(state_data, state_fips)
 
     return solve_geodata_plan(
         state_data=state_data,
@@ -272,7 +276,13 @@ def merge_census_geodata(shapefile_path: str, census_df: pd.DataFrame) -> gpd.Ge
     return merged
 
 
-def approximate_district_count(state_data: gpd.GeoDataFrame) -> int:
+def approximate_district_count(
+    state_data: gpd.GeoDataFrame,
+    state_fips: Optional[str] = None,
+) -> int:
+    seats = get_apportioned_seats(state_fips)
+    if seats is not None:
+        return seats
     total_population = pd.to_numeric(
         state_data["P1_001N"], errors="coerce"
     ).fillna(0).sum()
@@ -303,8 +313,8 @@ def compute_district_metrics(districts: Iterable[gpd.GeoDataFrame]) -> List[Dict
                 "district_id": idx + 1,
                 "population": int(round(pop)),
                 "deviation_pct": round(deviation_pct, 3),
-                "compactness_polsby_popper": round(float(_polsby_popper_static(district)), 4),
-                "partisan_dem_share": round(float(_weighted_partisan_share(district)), 4),
+                "compactness_polsby_popper": round(float(polsby_popper(district)), 4),
+                "partisan_dem_share": round(float(weighted_partisan_share(district)), 4),
                 "contiguous": bool(is_contiguous(district)),
                 "unit_count": int(len(district)),
             }
