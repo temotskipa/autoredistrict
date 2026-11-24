@@ -4,6 +4,9 @@ plugins {
 
 val libs = the<VersionCatalogsExtension>().named("libs")
 
+// Matches the Java module and package names (com.temotskipa.autoredistrict.<module>).
+group = "com.temotskipa.autoredistrict"
+
 repositories {
 	mavenCentral()
 	maven {
@@ -27,9 +30,14 @@ java {
 tasks.withType<JavaCompile>().configureEach {
 	options.encoding = "UTF-8"
 	options.release = 28
-	options.compilerArgs.addAll(JvmFlags.preview + listOf("-Xlint:all,-preview,-serial,-processing,-this-escape"))
+	// GeoTools and JTS are automatic modules; requiring them is deliberate, so those lints stay off.
+	options.compilerArgs.addAll(
+		JvmFlags.preview +
+				listOf("-Xlint:all,-preview,-serial,-processing,-this-escape,-requires-automatic,-requires-transitive-automatic")
+	)
 }
 
+// Tests have no module-info, so they run on the class path (white-box, the main module-info is ignored).
 tasks.withType<Test>().configureEach {
 	useJUnitPlatform()
 	jvmArgs(JvmFlags.launch)
@@ -37,10 +45,6 @@ tasks.withType<Test>().configureEach {
 		events("failed", "skipped")
 		exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
 	}
-}
-
-tasks.withType<JavaExec>().configureEach {
-	jvmArgs(JvmFlags.launch)
 }
 
 tasks.withType<Jar>().configureEach {

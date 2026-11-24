@@ -12,12 +12,9 @@ dependencies {
 
 application {
 	applicationName = "autoredistrict-gui"
-	mainClass = "autoredistrict.gui.Launcher"
+	mainModule = "com.temotskipa.autoredistrict.gui"
+	mainClass = "com.temotskipa.autoredistrict.gui.Launcher"
 	applicationDefaultJvmArgs = JvmFlags.gui
-}
-
-tasks.named<JavaExec>("run") {
-	jvmArgs("--enable-native-access=ALL-UNNAMED")
 }
 
 // AOT cache (JEP 483/514/515): the start script uses lib/gui.aot when it exists. A cache that

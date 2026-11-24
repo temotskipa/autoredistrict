@@ -9,6 +9,9 @@ Elections made-to-order"; README.md describes it.
 
 ## Modules
 
+Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<project>` with one package of the same
+name (`engine` <- `data` <- `service` -> `render`; `cli` and `gui` on top of `service`).
+
 - `engine`: pure Java, no I/O and no GeoTools. `Graph` (CSR adjacency), `Districting` (chain state, incremental
   tallies, contiguity, scoring, the pruning move), `SingleFlip` behind `MoveKernel`, `SeatBands`, `Chain` (phases,
   temperatures, repair), `Annealer` (parallel seeds with `StructuredTaskScope` on platform threads).
@@ -18,16 +21,19 @@ Elections made-to-order"; README.md describes it.
 - `service`: `PlanService` (run, at-large short cut), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS checks),
   `SeatRange`, `BatchRunner`, `Artifacts`, `ImportService`. New features belong here, not in a front end.
 - `render`: `MapPainter` over `Canvas2D` (Java2D here, JavaFX in the GUI), `MapRenderer`, `Exporters`.
-- `cli`: `autoredistrict.cli.Main` with `import`, `run`, `all`, `seat-range`.
-- `gui`: `autoredistrict.gui.Launcher` and `App`, including snapshot mode.
+- `cli`: `Main` with `import`, `run`, `all`, `seat-range`.
+- `gui`: `Launcher` and `App`, including snapshot mode.
 
 ## Development guidelines
 
 - Build with the Gradle wrapper: `.\gradlew.bat test` must pass before a change is done. Tests live in each module's
   `src/test/java`; fixtures are small synthetic files in `src/test/resources` or built by the tests.
-- The toolchain is JDK 28 EA in `~/.jdks`. `--enable-preview` and the launch flags live in `buildSrc` (`JvmFlags`,
-  the `autoredistrict.java-conventions` and `autoredistrict.application-conventions` plugins); don't add them per
-  module.
+- The toolchain is JDK 28 EA in `~/.jdks`. `--enable-preview` and the launch flags live in the `build-logic` included
+  build (`JvmFlags`, the `autoredistrict.java-conventions` and `autoredistrict.application-conventions` plugins); don't
+  add them per module.
+- JPMS: every module has a `module-info.java`; the apps run on the module path. A new dependency needs a `requires`
+  (and `opens` if it reflects on our classes, like Jackson, picocli and JavaFX). Tests have no module-info and run on
+  the class path. GeoTools and JTS are automatic modules; `data` and `render` list the JDK modules GeoTools needs.
 - Java conventions: standard Java naming, 4-space indents, no wildcard imports in new code, `value record` for small
   immutable types, records for data carriers, primitive arrays in the engine's hot loop (no allocation per step).
 - Keep front ends thin. Logic shared by the GUI and the CLI goes in `service`.

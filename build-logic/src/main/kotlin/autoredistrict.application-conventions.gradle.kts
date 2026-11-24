@@ -3,8 +3,18 @@ plugins {
 	application
 }
 
+// Each application sets mainModule and mainClass; the run task and the start scripts then use
+// --module-path and --module. Jars that are not modules (a few GeoTools dependencies) stay on the
+// class path, where the automatic GeoTools modules can read them.
 application {
-	applicationDefaultJvmArgs = JvmFlags.launch
+	applicationDefaultJvmArgs = JvmFlags.app
+}
+
+// With mainModule set, Gradle also writes the main class into module-info.class, using its bundled
+// ASM, which can't read Java 28 class files ("Unsupported class file major version 72"). Not needed:
+// the run task and the start scripts pass --module <module>/<main class>.
+tasks.named<JavaCompile>("compileJava") {
+	options.javaModuleMainClass.unsetConvention()
 }
 
 // `gradlew :cli:run` and `:gui:run` start in the repository root, so .cache and out/ resolve there.

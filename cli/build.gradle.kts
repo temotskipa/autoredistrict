@@ -9,5 +9,6 @@ dependencies {
 
 application {
 	applicationName = "autoredistrict"
-	mainClass = "autoredistrict.cli.Main"
+	mainModule = "com.temotskipa.autoredistrict.cli"
+	mainClass = "com.temotskipa.autoredistrict.cli.Main"
 }

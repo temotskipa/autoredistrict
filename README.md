@@ -136,19 +136,28 @@ gui\build\install\autoredistrict-gui\bin\autoredistrict-gui.bat --snapshot ME --
 ```
 
 `.\gradlew.bat :gui:aotCache` builds an AOT cache (JEP 483/514/515) with a training run of that snapshot; the start
-script uses it when present. On the development machine the window appears in about 0.73 s with the cache and
-1.4 s without.
+script uses it when present. On the development machine the window appears in about 0.57 s with the cache and
+1.2 s without.
 
 ## Layout
+
+Each Gradle project is a named Java module, `com.temotskipa.autoredistrict.<project>`, with one package of the same
+name. Convention plugins (toolchain, preview and launch flags) live in the `build-logic` included build.
 
 | Module    | Contents                                                                                                                                                                                  |
 |-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `engine`  | Pure Java, no I/O: the `Graph`, the chain state (`Districting`), the single-flip move kernel behind `MoveKernel`, seat-band scoring, the three-phase `Chain` and the parallel `Annealer`. |
 | `data`    | RDH import (GeoTools), the per-state Albers equal-area projection, adjacency, connectivity repair, block votes to tracts, the cache, the 2020 apportionment table.                        |
-| `service` | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts.                                                                          |
 | `render`  | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI.                                                                                |
+| `service` | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts. Requires `data` and `render`.                                            |
 | `cli`     | picocli front end.                                                                                                                                                                        |
 | `gui`     | JavaFX front end.                                                                                                                                                                         |
+
+Both applications run on the module path (`--module com.temotskipa.autoredistrict.cli/...`), which is what JavaFX
+supports. GeoTools and JTS are automatic modules, so `data` and `render` also require the JDK modules GeoTools uses,
+and the launch adds `--add-modules=ALL-MODULE-PATH` for the explicit modules it needs. A few plain jars without module
+names (ejml, re2j and others GeoTools pulls in) stay on the class path. jlink and jpackage would need every module to be
+explicit, so the apps ship as start scripts.
 
 The engine's hot loop runs on primitive arrays and allocates nothing. JDK 28 features in use: value classes (JEP 401,
 preview) for small immutable types such as points, bounding boxes, edges, weights, targets and result rows;
