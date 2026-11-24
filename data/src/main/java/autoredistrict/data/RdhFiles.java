@@ -12,30 +12,34 @@ import java.util.List;
  * {@code national_block_2020_pres_results.zip} (2020 presidential results on all blocks).
  */
 public final class RdhFiles {
-
+    
     public static final String NATIONAL_2020 = "national_block_2020_pres_results.zip";
-
+    
     private RdhFiles() {
     }
-
+    
     public static Path tractZip(Path dir, StateInfo s) {
         return dir.resolve(s.key() + "_pl2020_t.zip");
     }
-
+    
     public static Path votes2024Zip(Path dir, StateInfo s) {
         return dir.resolve(s.key() + "_2024_gen_2020_blocks_csv.zip");
     }
-
+    
     public static Path national2020(Path dir) {
         return dir.resolve(NATIONAL_2020);
     }
-
-    /** RDH publishes 2024 block results for every state but California (precincts only there). */
+    
+    /**
+     * RDH publishes 2024 block results for every state but California (precincts only there).
+     */
     public static boolean rdhHas2024(StateInfo s) {
         return !s.abbr().equals("CA");
     }
-
-    /** File names that must be downloaded before {@code states} can be imported. */
+    
+    /**
+     * File names that must be downloaded before {@code states} can be imported.
+     */
     public static List<String> missing(Path dir, List<StateInfo> states) {
         List<String> out = new ArrayList<>();
         for (StateInfo s : states) {

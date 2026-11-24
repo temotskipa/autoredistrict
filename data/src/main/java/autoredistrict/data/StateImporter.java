@@ -1,5 +1,12 @@
 package autoredistrict.data;
 
+import autoredistrict.data.BlockVotes.Election;
+import autoredistrict.data.BlockVotes.TractVotes;
+import org.locationtech.jts.coverage.CoverageSimplifier;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.simplify.TopologyPreservingSimplifier;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -7,25 +14,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.StructuredTaskScope;
 import java.util.function.Consumer;
-
-import org.locationtech.jts.coverage.CoverageSimplifier;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.Point;
-import org.locationtech.jts.simplify.TopologyPreservingSimplifier;
-
-import autoredistrict.data.BlockVotes.Election;
-import autoredistrict.data.BlockVotes.TractVotes;
 
 /**
  * Imports RDH downloads into the cache: tract geometry and population, the projection, adjacency,
@@ -33,38 +25,25 @@ import autoredistrict.data.BlockVotes.TractVotes;
  * (the national file, read once for all states).
  */
 public final class StateImporter {
-
-    /** Map geometry is simplified as a coverage to this tolerance; shared edges stay shared. */
+    
+    /**
+     * Map geometry is simplified as a coverage to this tolerance; shared edges stay shared.
+     */
     public static final double SIMPLIFY_METRES = 25.0;
-
+    
     private StateImporter() {
     }
-
-    /** One line of the import summary table. */
-    public record ImportSummary(StateInfo state, int tracts, long population, int edges, int bridges,
-                                int componentsBefore, int fallbackPairs, String defaultElection,
-                                double dem, double rep, long tractsWithoutVotes, long blocksOutside,
-                                double seconds, List<String> warnings, String error) {
-
-        public boolean ok() {
-            return error == null;
-        }
-
-        public double demShare() {
-            return dem + rep > 0 ? dem / (dem + rep) : 0.5;
-        }
-    }
-
-    /** Imports one state's tract zip and (if given) its 2024 vote zip. */
+    
+    /**
+     * Imports one state's tract zip and (if given) its 2024 vote zip.
+     */
     public static ImportSummary importState(StateInfo s, Path tractZip, Path votes2024Zip, Path cacheRoot) {
         long t0 = System.nanoTime();
         RdhTractImporter.TractLayer layer = single(RdhTractImporter.read(List.of(tractZip), s.fips(), "tract"), s);
         if (!layer.geographicWkt().startsWith("GEOGCS")) {
-            throw new DataException(tractZip.getFileName() + " isn't in geographic coordinates (its .prj is not a "
-                    + "GEOGCS); RDH tract files are NAD83 longitude/latitude.");
+            throw new DataException(tractZip.getFileName() + " isn't in geographic coordinates (its .prj is not a " + "GEOGCS); RDH tract files are NAD83 longitude/latitude.");
         }
-        AlbersProjection proj = AlbersProjection.forBounds(AlbersProjection.unwrappedBounds(layer.geometries()),
-                layer.geographicWkt());
+        AlbersProjection proj = AlbersProjection.forBounds(AlbersProjection.unwrappedBounds(layer.geometries()), layer.geographicWkt());
         int n = layer.size();
         List<Geometry> projected = new ArrayList<>(n);
         for (Geometry g : layer.geometries()) {
@@ -72,7 +51,7 @@ public final class StateImporter {
         }
         AdjacencyBuilder.Adjacency adj = AdjacencyBuilder.build(layer.geometries(), projected);
         Connectivity.Repair repair = Connectivity.connect(projected, adj.a(), adj.b());
-
+        
         int m = adj.edgeCount() + repair.bridges().size();
         TractCache.Edges edges = new TractCache.Edges(new int[m], new int[m], new double[m], new boolean[m]);
         for (int e = 0; e < adj.edgeCount(); e++) {
@@ -87,13 +66,10 @@ public final class StateImporter {
             edges.a()[e] = b.a();
             edges.b()[e] = b.b();
             edges.bridge()[e] = true;
-            bridgeInfo.add(new Manifest.BridgeInfo(layer.geoids().get(b.a()), layer.geoids().get(b.b()),
-                    Math.round(b.gapMetres() * 10) / 10.0));
+            bridgeInfo.add(new Manifest.BridgeInfo(layer.geoids().get(b.a()), layer.geoids().get(b.b()), Math.round(b.gapMetres() * 10) / 10.0));
         }
-
-        TractCache.Tracts tracts = new TractCache.Tracts(layer.geoids().toArray(String[]::new),
-                layer.names().toArray(String[]::new), layer.pop().clone(), new double[n], new double[n], new double[n],
-                adj.perimeter(), adj.outer());
+        
+        TractCache.Tracts tracts = new TractCache.Tracts(layer.geoids().toArray(String[]::new), layer.names().toArray(String[]::new), layer.pop().clone(), new double[n], new double[n], new double[n], adj.perimeter(), adj.outer());
         for (int i = 0; i < n; i++) {
             Geometry g = projected.get(i);
             tracts.area()[i] = g.getArea();
@@ -105,7 +81,7 @@ public final class StateImporter {
             tracts.y()[i] = c.getY();
         }
         List<Geometry> simplified = simplify(projected);
-
+        
         List<String> warnings = new ArrayList<>(layer.warnings());
         TractVotes votes = null;
         Manifest.VoteInfo voteInfo = null;
@@ -124,35 +100,23 @@ public final class StateImporter {
             long missing = votes.tractsMissing(layer.geoids());
             String warn = null;
             if (votes.blocksOutside() > 0) {
-                warn = votes.blocksOutside() + " blocks in " + votes2024Zip.getFileName()
-                        + " fall outside the state's tracts and were skipped.";
+                warn = votes.blocksOutside() + " blocks in " + votes2024Zip.getFileName() + " fall outside the state's tracts and were skipped.";
                 warnings.add(warn);
             }
-            voteInfo = new Manifest.VoteInfo("2024", votes2024Zip.getFileName().toString(), Json.sha256(votes2024Zip),
-                    votes.dem(), votes.rep(), votes.demShare(), votes.blocks(), votes.blocksOutside(), missing, null, warn);
+            voteInfo = new Manifest.VoteInfo("2024", votes2024Zip.getFileName().toString(), Json.sha256(votes2024Zip), votes.dem(), votes.rep(), votes.demShare(), votes.blocks(), votes.blocksOutside(), missing, null, warn);
         }
-
-        Manifest.ProjectionInfo pinfo = new Manifest.ProjectionInfo(proj.standardParallel1(),
-                proj.standardParallel2(), proj.latitudeOfCenter(), proj.longitudeOfCenter(), proj.geographicWkt(),
-                proj.wkt());
+        
+        Manifest.ProjectionInfo pinfo = new Manifest.ProjectionInfo(proj.standardParallel1(), proj.standardParallel2(), proj.latitudeOfCenter(), proj.longitudeOfCenter(), proj.geographicWkt(), proj.wkt());
         Map<String, Manifest.VoteInfo> voteMap = new java.util.TreeMap<>();
         if (voteInfo != null) {
             voteMap.put("2024", voteInfo);
         }
-        Manifest manifest = new Manifest(Manifest.FORMAT, s.abbr(), s.fips(), s.name(), s.seats(),
-                "Redistricting Data Hub", List.of(inputFile(tractZip)), layer.memberFiles(),
-                Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(), n, layer.totalPopulation(), m,
-                adj.hashedPairs(), adj.fallbackPairs(), repair.componentsBefore(), bridgeInfo, pinfo,
-                SIMPLIFY_METRES, voteMap, warnings);
-        TractCache.write(cacheRoot, s, manifest, tracts, edges, simplified,
-                voteInfo == null ? null : Election.Y2024, dem, rep);
+        Manifest manifest = new Manifest(Manifest.FORMAT, s.abbr(), s.fips(), s.name(), s.seats(), "Redistricting Data Hub", List.of(inputFile(tractZip)), layer.memberFiles(), Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(), n, layer.totalPopulation(), m, adj.hashedPairs(), adj.fallbackPairs(), repair.componentsBefore(), bridgeInfo, pinfo, SIMPLIFY_METRES, voteMap, warnings);
+        TractCache.write(cacheRoot, s, manifest, tracts, edges, simplified, voteInfo == null ? null : Election.Y2024, dem, rep);
         double secs = (System.nanoTime() - t0) / 1e9;
-        return new ImportSummary(s, n, layer.totalPopulation(), m, repair.bridges().size(), repair.componentsBefore(),
-                adj.fallbackPairs(), voteInfo == null ? "-" : "2024", voteInfo == null ? 0 : voteInfo.dem(),
-                voteInfo == null ? 0 : voteInfo.rep(), voteInfo == null ? n : voteInfo.tractsMissing(),
-                voteInfo == null ? 0 : voteInfo.blocksOutside(), secs, warnings, null);
+        return new ImportSummary(s, n, layer.totalPopulation(), m, repair.bridges().size(), repair.componentsBefore(), adj.fallbackPairs(), voteInfo == null ? "-" : "2024", voteInfo == null ? 0 : voteInfo.dem(), voteInfo == null ? 0 : voteInfo.rep(), voteInfo == null ? n : voteInfo.tractsMissing(), voteInfo == null ? 0 : voteInfo.blocksOutside(), secs, warnings, null);
     }
-
+    
     /**
      * Sums the national 2020 file into every listed state's cache (one pass over the CSV) and
      * reports per state. TOT_POP mismatches with the PL population are warnings, not errors.
@@ -185,43 +149,36 @@ public final class StateImporter {
             }
             String warn = null;
             if (Math.abs(v.totPop() - pl) > 0.0005 * pl) {
-                warn = String.format(Locale.ROOT, "TOT_POP in %s sums to %,.0f for %s, %.1f%% of the PL population "
-                        + "%,d; population comes from PL, the file is used for votes only.",
-                        nationalZip.getFileName(), v.totPop(), s.abbr(), 100.0 * v.totPop() / pl, pl);
+                warn = String.format(Locale.ROOT, "TOT_POP in %s sums to %,.0f for %s, %.1f%% of the PL population " + "%,d; population comes from PL, the file is used for votes only.", nationalZip.getFileName(), v.totPop(), s.abbr(), 100.0 * v.totPop() / pl, pl);
             }
             if (v.blocksOutside() > 0) {
-                String w = v.blocksOutside() + " blocks for " + s.abbr() + " in " + nationalZip.getFileName()
-                        + " fall outside its tracts and were skipped.";
+                String w = v.blocksOutside() + " blocks for " + s.abbr() + " in " + nationalZip.getFileName() + " fall outside its tracts and were skipped.";
                 warn = warn == null ? w : warn + " " + w;
             }
             List<String> ids = List.of(t.geoid());
             double[] dem = new double[ids.size()];
             double[] rep = new double[ids.size()];
             fill(v, ids, dem, rep);
-            Manifest.VoteInfo info = new Manifest.VoteInfo("2020", nationalZip.getFileName().toString(), sha, v.dem(),
-                    v.rep(), v.demShare(), v.blocks(), v.blocksOutside(), v.tractsMissing(ids), v.totPop(), warn);
+            Manifest.VoteInfo info = new Manifest.VoteInfo("2020", nationalZip.getFileName().toString(), sha, v.dem(), v.rep(), v.demShare(), v.blocks(), v.blocksOutside(), v.tractsMissing(ids), v.totPop(), warn);
             TractCache.writeVotes(cacheRoot, s, Election.Y2020, dem, rep, info);
             out.put(s.abbr(), info);
         }
         return out;
     }
-
+    
     /**
      * Imports every listed state from an RDH download folder: tract and 2024 files in parallel
      * (structured concurrency, platform threads), then the national 2020 file once. Per-state
      * failures are recorded in the summary rather than stopping the others.
      */
-    public static List<ImportSummary> importAll(Path rdhDir, List<StateInfo> states, Path cacheRoot, int parallel,
-                                                Consumer<String> log) throws InterruptedException {
+    public static List<ImportSummary> importAll(Path rdhDir, List<StateInfo> states, Path cacheRoot, int parallel, Consumer<String> log) throws InterruptedException {
         List<String> missing = RdhFiles.missing(rdhDir, states);
         if (!missing.isEmpty()) {
             throw new MissingFilesException(rdhDir, missing);
         }
         Semaphore permits = new Semaphore(Math.max(1, parallel));
         List<StructuredTaskScope.Subtask<ImportSummary>> tasks = new ArrayList<>();
-        try (var scope = StructuredTaskScope.open(
-                StructuredTaskScope.Joiner.<ImportSummary>allUntil(t -> false),
-                cfg -> cfg.withThreadFactory(Thread.ofPlatform().name("import-", 0).factory()))) {
+        try (var scope = StructuredTaskScope.open(StructuredTaskScope.Joiner.<ImportSummary>allUntil(t -> false), cfg -> cfg.withThreadFactory(Thread.ofPlatform().name("import-", 0).factory()))) {
             for (StateInfo s : states) {
                 tasks.add(scope.fork(() -> {
                     permits.acquire();
@@ -229,13 +186,11 @@ public final class StateImporter {
                     try {
                         Path votes = RdhFiles.rdhHas2024(s) ? RdhFiles.votes2024Zip(rdhDir, s) : null;
                         ImportSummary sum = importState(s, RdhFiles.tractZip(rdhDir, s), votes, cacheRoot);
-                        log.accept(String.format(Locale.ROOT, "imported %s: %d tracts in %.1f s", s.abbr(),
-                                sum.tracts(), sum.seconds()));
+                        log.accept(String.format(Locale.ROOT, "imported %s: %d tracts in %.1f s", s.abbr(), sum.tracts(), sum.seconds()));
                         return sum;
                     } catch (RuntimeException e) {
                         log.accept("FAILED " + s.abbr() + ": " + e.getMessage());
-                        return new ImportSummary(s, 0, 0, 0, 0, 0, 0, "-", 0, 0, 0, 0,
-                                (System.nanoTime() - t0) / 1e9, List.of(), e.toString());
+                        return new ImportSummary(s, 0, 0, 0, 0, 0, 0, "-", 0, 0, 0, 0, (System.nanoTime() - t0) / 1e9, List.of(), e.toString());
                     } finally {
                         permits.release();
                     }
@@ -251,8 +206,7 @@ public final class StateImporter {
         if (!imported.isEmpty()) {
             long t0 = System.nanoTime();
             Map<String, Manifest.VoteInfo> v2020 = import2020(RdhFiles.national2020(rdhDir), imported, cacheRoot);
-            log.accept(String.format(Locale.ROOT, "summed %s for %d states in %.1f s", RdhFiles.NATIONAL_2020,
-                    v2020.size(), (System.nanoTime() - t0) / 1e9));
+            log.accept(String.format(Locale.ROOT, "summed %s for %d states in %.1f s", RdhFiles.NATIONAL_2020, v2020.size(), (System.nanoTime() - t0) / 1e9));
             for (int i = 0; i < results.size(); i++) {
                 ImportSummary r = results.get(i);
                 Manifest.VoteInfo v = v2020.get(r.state().abbr());
@@ -262,29 +216,13 @@ public final class StateImporter {
                     if (v.warning() != null) {
                         w.add(v.warning());
                     }
-                    results.set(i, new ImportSummary(r.state(), r.tracts(), r.population(), r.edges(), r.bridges(),
-                            r.componentsBefore(), r.fallbackPairs(), "2020 (fallback)", v.dem(), v.rep(),
-                            v.tractsMissing(), v.blocksOutside(), r.seconds(), w, null));
+                    results.set(i, new ImportSummary(r.state(), r.tracts(), r.population(), r.edges(), r.bridges(), r.componentsBefore(), r.fallbackPairs(), "2020 (fallback)", v.dem(), v.rep(), v.tractsMissing(), v.blocksOutside(), r.seconds(), w, null));
                 }
             }
         }
         return results;
     }
-
-    /** Raised when RDH files are missing; lists exactly which to download. */
-    public static final class MissingFilesException extends DataException {
-        private final List<String> files;
-
-        public MissingFilesException(Path dir, List<String> files) {
-            super("Missing " + files.size() + " RDH file(s) in " + dir + ": " + String.join(", ", files));
-            this.files = List.copyOf(files);
-        }
-
-        public List<String> files() {
-            return files;
-        }
-    }
-
+    
     private static void fill(TractVotes v, List<String> geoids, double[] dem, double[] rep) {
         for (int i = 0; i < geoids.size(); i++) {
             double[] t = v.byTract().get(geoids.get(i));
@@ -294,7 +232,7 @@ public final class StateImporter {
             }
         }
     }
-
+    
     static List<Geometry> simplify(List<Geometry> projected) {
         Geometry[] arr = projected.toArray(Geometry[]::new);
         try {
@@ -312,7 +250,7 @@ public final class StateImporter {
             return out;
         }
     }
-
+    
     private static Manifest.InputFile inputFile(Path p) {
         try {
             return new Manifest.InputFile(p.getFileName().toString(), Json.sha256(p), Files.size(p));
@@ -320,11 +258,41 @@ public final class StateImporter {
             throw new UncheckedIOException("Could not read " + p, e);
         }
     }
-
+    
     private static RdhTractImporter.TractLayer single(List<RdhTractImporter.TractLayer> layers, StateInfo s) {
         if (layers.size() != 1) {
             throw new DataException("Expected one tract layer for " + s.abbr() + ", found " + layers.size() + ".");
         }
         return layers.getFirst();
+    }
+    
+    /**
+     * One line of the import summary table.
+     */
+    public record ImportSummary(StateInfo state, int tracts, long population, int edges, int bridges, int componentsBefore, int fallbackPairs, String defaultElection, double dem, double rep, long tractsWithoutVotes, long blocksOutside, double seconds, List<String> warnings, String error) {
+        
+        public boolean ok() {
+            return error == null;
+        }
+        
+        public double demShare() {
+            return dem + rep > 0 ? dem / (dem + rep) : 0.5;
+        }
+    }
+    
+    /**
+     * Raised when RDH files are missing; lists exactly which to download.
+     */
+    public static final class MissingFilesException extends DataException {
+        private final List<String> files;
+        
+        public MissingFilesException(Path dir, List<String> files) {
+            super("Missing " + files.size() + " RDH file(s) in " + dir + ": " + String.join(", ", files));
+            this.files = List.copyOf(files);
+        }
+        
+        public List<String> files() {
+            return files;
+        }
     }
 }

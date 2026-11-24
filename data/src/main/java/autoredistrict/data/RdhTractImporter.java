@@ -1,28 +1,5 @@
 package autoredistrict.data;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.UncheckedIOException;
-import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeMap;
-import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipException;
-import java.util.zip.ZipInputStream;
-
 import org.geotools.api.data.Query;
 import org.geotools.api.data.SimpleFeatureSource;
 import org.geotools.api.feature.simple.SimpleFeature;
@@ -31,6 +8,20 @@ import org.geotools.api.feature.type.AttributeDescriptor;
 import org.geotools.data.shapefile.ShapefileDataStore;
 import org.geotools.data.simple.SimpleFeatureIterator;
 import org.locationtech.jts.geom.Geometry;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
+import java.util.zip.ZipInputStream;
 
 /**
  * Reads Redistricting Data Hub 2020 PL 94-171 tract downloads, for example {@code me_pl2020_t.zip}.
@@ -42,45 +33,14 @@ import org.locationtech.jts.geom.Geometry;
  * {@code P1_001N}).
  */
 public final class RdhTractImporter {
-
+    
     static final List<String> GEOID_COLUMNS = List.of("GEOID20", "GEOID", "GEOCODE");
     static final List<String> NAME_COLUMNS = List.of("NAME", "NAMELSAD20", "NAMELSAD", "NAME20");
     static final List<String> POP_COLUMNS = List.of("P0010001", "P1_001N");
-
+    
     private RdhTractImporter() {
     }
-
-    /** One state's tracts: counts joined to lon/lat geometry. */
-    public record TractLayer(String stateFips, List<String> geoids, List<String> names, int[] pop,
-                             List<Geometry> geometries, String geographicWkt, List<String> memberFiles,
-                             List<String> warnings) {
-
-        public int size() {
-            return geoids.size();
-        }
-
-        public long totalPopulation() {
-            long s = 0;
-            for (int p : pop) {
-                s += p;
-            }
-            return s;
-        }
-    }
-
-    /** A layer read from one .shp or .csv file. */
-    private record Layer(Path source, List<String> geoids, List<String> names, long[] pop,
-                         List<Geometry> geometries, String prjWkt, String stateFips, String resolution) {
-
-        boolean hasCounts() {
-            return pop != null;
-        }
-
-        boolean hasGeometry() {
-            return geometries != null && geometries.stream().anyMatch(g -> g != null && !g.isEmpty());
-        }
-    }
-
+    
     /**
      * Imports the given files. When {@code expectedFips} or {@code expectedResolution} is given,
      * every input must match it.
@@ -108,8 +68,7 @@ public final class RdhTractImporter {
                 }
             }
             if (layers.isEmpty()) {
-                throw new DataException("No tract or block layer with a GEOID20/GEOID column was found. "
-                        + "Download the shapefile version of RDH's 2020 PL 94-171 tract file (xx_pl2020_t.zip).");
+                throw new DataException("No tract or block layer with a GEOID20/GEOID column was found. " + "Download the shapefile version of RDH's 2020 PL 94-171 tract file (xx_pl2020_t.zip).");
             }
             Map<String, List<Layer>> groups = new TreeMap<>();
             for (Layer layer : layers) {
@@ -124,8 +83,7 @@ public final class RdhTractImporter {
                     throw new DataException("Files are at " + first.resolution + " level, not " + expectedResolution + ".");
                 }
                 if (!first.resolution.equals("tract")) {
-                    throw new DataException("Files for state FIPS " + first.stateFips + " are at " + first.resolution
-                            + " level; autoredistrict works on tracts. Import the tract file (xx_pl2020_t.zip).");
+                    throw new DataException("Files for state FIPS " + first.stateFips + " are at " + first.resolution + " level; autoredistrict works on tracts. Import the tract file (xx_pl2020_t.zip).");
                 }
             }
             List<TractLayer> out = new ArrayList<>();
@@ -137,7 +95,7 @@ public final class RdhTractImporter {
             deleteRecursively(workdir);
         }
     }
-
+    
     private static void expand(Path path, Path workdir, List<Path> found) {
         if (!Files.exists(path)) {
             throw new DataException("File not found: " + path);
@@ -162,11 +120,12 @@ public final class RdhTractImporter {
             }
             unzip(path, target);
             expand(target, workdir, found);
-        } else if (name.endsWith(".shp") || name.endsWith(".csv")) {
+        }
+        else if (name.endsWith(".shp") || name.endsWith(".csv")) {
             found.add(path);
         }
     }
-
+    
     static void unzip(Path zip, Path target) {
         try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
             ZipEntry entry;
@@ -179,7 +138,8 @@ public final class RdhTractImporter {
                 }
                 if (entry.isDirectory()) {
                     Files.createDirectories(out);
-                } else {
+                }
+                else {
                     Files.createDirectories(out.getParent());
                     Files.copy(in, out);
                 }
@@ -193,7 +153,7 @@ public final class RdhTractImporter {
             throw new UncheckedIOException("Could not extract " + zip, e);
         }
     }
-
+    
     private static Layer readLayer(Path path) {
         String lower = path.getFileName().toString().toLowerCase(Locale.ROOT);
         try {
@@ -204,7 +164,7 @@ public final class RdhTractImporter {
             throw new DataException("Could not read " + path.getFileName() + ": " + e.getMessage(), e);
         }
     }
-
+    
     private static Layer readCsv(Path path) throws IOException {
         try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
             List<String> header = Csv.header(reader, path.getFileName().toString());
@@ -234,7 +194,7 @@ public final class RdhTractImporter {
             return finish(path, geoids, names, pop, null, null);
         }
     }
-
+    
     private static Layer readShapefile(Path shp) throws IOException {
         Path prj = sibling(shp, ".prj");
         String prjWkt = prj == null ? null : Files.readString(prj, StandardCharsets.UTF_8).strip();
@@ -262,8 +222,7 @@ public final class RdhTractImporter {
             }
             String nameCol = firstPresent(columns, NAME_COLUMNS);
             String popCol = firstPresent(columns, POP_COLUMNS);
-            String geomCol = schema.getGeometryDescriptor() == null ? null
-                    : schema.getGeometryDescriptor().getLocalName();
+            String geomCol = schema.getGeometryDescriptor() == null ? null : schema.getGeometryDescriptor().getLocalName();
             List<String> props = new ArrayList<>(List.of(geoidCol));
             if (nameCol != null) {
                 props.add(nameCol);
@@ -304,7 +263,7 @@ public final class RdhTractImporter {
             store.dispose();
         }
     }
-
+    
     private static long parseCount(String raw, String column, Path source) {
         String s = raw.strip();
         if (s.endsWith(".0")) {
@@ -319,9 +278,8 @@ public final class RdhTractImporter {
             throw new DataException(source.getFileName() + " has blank or non-numeric values in " + column + ".");
         }
     }
-
-    private static Layer finish(Path source, List<String> rawIds, List<String> names, long[] pop,
-                                List<Geometry> geoms, String prjWkt) {
+    
+    private static Layer finish(Path source, List<String> rawIds, List<String> names, long[] pop, List<Geometry> geoms, String prjWkt) {
         List<String> ids = new ArrayList<>(rawIds.size());
         int longest = 0;
         for (String raw : rawIds) {
@@ -353,24 +311,20 @@ public final class RdhTractImporter {
             }
         }
         if (states.size() != 1) {
-            throw new DataException(source.getFileName() + " covers several states ("
-                    + String.join(", ", new java.util.TreeSet<>(states)) + "); import one state at a time.");
+            throw new DataException(source.getFileName() + " covers several states (" + String.join(", ", new java.util.TreeSet<>(states)) + "); import one state at a time.");
         }
         return new Layer(source, ids, names, pop, geoms, prjWkt, states.iterator().next(), resolution);
     }
-
+    
     private static TractLayer join(List<Layer> group) {
         Layer counts = group.stream().filter(Layer::hasCounts).findFirst().orElse(null);
         String label = "state " + group.getFirst().stateFips + " at " + group.getFirst().resolution + " level";
         if (counts == null) {
-            throw new DataException("No population counts for " + label + ": expected a P0010001 column. "
-                    + "Use RDH's PL 94-171 file, not a boundary-only file.");
+            throw new DataException("No population counts for " + label + ": expected a P0010001 column. " + "Use RDH's PL 94-171 file, not a boundary-only file.");
         }
-        Layer geometry = counts.hasGeometry() ? counts
-                : group.stream().filter(Layer::hasGeometry).findFirst().orElse(null);
+        Layer geometry = counts.hasGeometry() ? counts : group.stream().filter(Layer::hasGeometry).findFirst().orElse(null);
         if (geometry == null) {
-            throw new DataException("No geometry for " + label + ": add the shapefile version of the RDH "
-                    + "download, or a boundary shapefile for the same geography.");
+            throw new DataException("No geometry for " + label + ": add the shapefile version of the RDH " + "download, or a boundary shapefile for the same geography.");
         }
         if (geometry.prjWkt == null || geometry.prjWkt.isBlank()) {
             throw new DataException(geometry.source.getFileName() + " has no coordinate system (missing .prj file).");
@@ -391,8 +345,7 @@ public final class RdhTractImporter {
         }
         if (!missing.isEmpty()) {
             missing.sort(Comparator.naturalOrder());
-            throw new DataException(missing.size() + " units for " + label + " have counts but no geometry "
-                    + "(for example GEOID " + missing.getFirst() + "). Use geometry from the same RDH download.");
+            throw new DataException(missing.size() + " units for " + label + " have counts but no geometry " + "(for example GEOID " + missing.getFirst() + "). Use geometry from the same RDH download.");
         }
         Set<String> countIds = new HashSet<>(counts.geoids);
         long extra = shapes.keySet().stream().filter(id -> !countIds.contains(id)).count();
@@ -405,18 +358,15 @@ public final class RdhTractImporter {
         for (int i = 0; i < n; i++) {
             long p = counts.pop[i];
             if (p < 0 || p > Integer.MAX_VALUE) {
-                throw new DataException(counts.source.getFileName() + " has an impossible population " + p
-                        + " for GEOID " + counts.geoids.get(i) + ".");
+                throw new DataException(counts.source.getFileName() + " has an impossible population " + p + " for GEOID " + counts.geoids.get(i) + ".");
             }
             pop[i] = (int) p;
             geoms.add(shapes.get(counts.geoids.get(i)));
         }
-        List<String> members = new ArrayList<>(new java.util.TreeSet<>(List.of(
-                counts.source.getFileName().toString(), geometry.source.getFileName().toString())));
-        return new TractLayer(counts.stateFips, List.copyOf(counts.geoids), List.copyOf(counts.names), pop,
-                List.copyOf(geoms), geometry.prjWkt, members, warnings);
+        List<String> members = new ArrayList<>(new java.util.TreeSet<>(List.of(counts.source.getFileName().toString(), geometry.source.getFileName().toString())));
+        return new TractLayer(counts.stateFips, List.copyOf(counts.geoids), List.copyOf(counts.names), pop, List.copyOf(geoms), geometry.prjWkt, members, warnings);
     }
-
+    
     private static String firstPresent(Map<String, String> columns, List<String> names) {
         for (String n : names) {
             String actual = columns.get(n.toUpperCase(Locale.ROOT));
@@ -426,7 +376,7 @@ public final class RdhTractImporter {
         }
         return null;
     }
-
+    
     private static Path sibling(Path shp, String ext) {
         String base = shp.getFileName().toString();
         base = base.substring(0, base.length() - 4);
@@ -438,7 +388,7 @@ public final class RdhTractImporter {
         }
         return null;
     }
-
+    
     static void deleteRecursively(Path root) {
         if (root == null || !Files.exists(root)) {
             return;
@@ -449,12 +399,13 @@ public final class RdhTractImporter {
             }
         } catch (IOException e) {
             // A leftover temp folder isn't worth failing an import over.
-            System.getLogger(RdhTractImporter.class.getName())
-                    .log(System.Logger.Level.DEBUG, "Could not delete " + root, e);
+            System.getLogger(RdhTractImporter.class.getName()).log(System.Logger.Level.DEBUG, "Could not delete " + root, e);
         }
     }
-
-    /** Opens a zip member as a stream (first entry whose name ends with the suffix). */
+    
+    /**
+     * Opens a zip member as a stream (first entry whose name ends with the suffix).
+     */
     static InputStream openZipMember(Path zip, String suffix) throws IOException {
         ZipInputStream in = new ZipInputStream(Files.newInputStream(zip));
         ZipEntry e;
@@ -465,5 +416,37 @@ public final class RdhTractImporter {
         }
         in.close();
         throw new DataException(zip.getFileName() + " has no " + suffix + " file inside.");
+    }
+    
+    /**
+     * One state's tracts: counts joined to lon/lat geometry.
+     */
+    public record TractLayer(String stateFips, List<String> geoids, List<String> names, int[] pop, List<Geometry> geometries, String geographicWkt, List<String> memberFiles, List<String> warnings) {
+        
+        public int size() {
+            return geoids.size();
+        }
+        
+        public long totalPopulation() {
+            long s = 0;
+            for (int p : pop) {
+                s += p;
+            }
+            return s;
+        }
+    }
+    
+    /**
+     * A layer read from one .shp or .csv file.
+     */
+    private record Layer(Path source, List<String> geoids, List<String> names, long[] pop, List<Geometry> geometries, String prjWkt, String stateFips, String resolution) {
+        
+        boolean hasCounts() {
+            return pop != null;
+        }
+        
+        boolean hasGeometry() {
+            return geometries != null && geometries.stream().anyMatch(g -> g != null && !g.isEmpty());
+        }
     }
 }

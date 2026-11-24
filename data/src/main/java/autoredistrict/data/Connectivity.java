@@ -1,12 +1,12 @@
 package autoredistrict.data;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.index.strtree.ItemBoundable;
 import org.locationtech.jts.index.strtree.ItemDistance;
 import org.locationtech.jts.index.strtree.STRtree;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Makes the unit graph connected. Islands (HI, AK, the Florida Keys, ME and MA islands...) and
@@ -16,18 +16,10 @@ import org.locationtech.jts.index.strtree.STRtree;
  * count for contiguity, like the water contiguity that real plans use, but add no boundary length.
  */
 public final class Connectivity {
-
+    
     private Connectivity() {
     }
-
-    /** A bridge edge between two units, with the gap it spans in metres. A value object. */
-    public value record Bridge(int a, int b, double gapMetres) {
-    }
-
-    /** Result: the bridges added and how many components there were before. */
-    public record Repair(List<Bridge> bridges, int componentsBefore) {
-    }
-
+    
     public static Repair connect(List<Geometry> projected, int[] edgeA, int[] edgeB) {
         int n = projected.size();
         UnionFind uf = new UnionFind(n);
@@ -112,11 +104,23 @@ public final class Connectivity {
         }
         return new Repair(bridges, before);
     }
-
+    
+    /**
+     * A bridge edge between two units, with the gap it spans in metres. A value object.
+     */
+    public value record Bridge(int a, int b, double gapMetres) {
+    }
+    
+    /**
+     * Result: the bridges added and how many components there were before.
+     */
+    public record Repair(List<Bridge> bridges, int componentsBefore) {
+    }
+    
     static final class UnionFind {
         private final int[] parent;
         private int count;
-
+        
         UnionFind(int n) {
             parent = new int[n];
             for (int i = 0; i < n; i++) {
@@ -124,7 +128,7 @@ public final class Connectivity {
             }
             count = n;
         }
-
+        
         int find(int x) {
             while (parent[x] != x) {
                 parent[x] = parent[parent[x]];
@@ -132,7 +136,7 @@ public final class Connectivity {
             }
             return x;
         }
-
+        
         void union(int a, int b) {
             int ra = find(a);
             int rb = find(b);
@@ -141,7 +145,7 @@ public final class Connectivity {
                 count--;
             }
         }
-
+        
         int count() {
             return count;
         }

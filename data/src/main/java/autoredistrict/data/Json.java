@@ -1,5 +1,8 @@
 package autoredistrict.data;
 
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -9,24 +12,23 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
-import tools.jackson.databind.SerializationFeature;
-import tools.jackson.databind.json.JsonMapper;
-
-/** Shared JSON mapper and file hashing. */
+/**
+ * Shared JSON mapper and file hashing.
+ */
 public final class Json {
-
+    
+    private static final LazyConstant<JsonMapper> MAPPER = LazyConstant.of(() -> JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build());
+    
     private Json() {
     }
-
-    private static final LazyConstant<JsonMapper> MAPPER = LazyConstant.of(() -> JsonMapper.builder()
-            .enable(SerializationFeature.INDENT_OUTPUT)
-            .build());
-
+    
     public static JsonMapper mapper() {
         return MAPPER.get();
     }
-
-    /** SHA-256 of a file as lower-case hex. */
+    
+    /**
+     * SHA-256 of a file as lower-case hex.
+     */
     public static String sha256(Path file) {
         try (InputStream in = Files.newInputStream(file)) {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");

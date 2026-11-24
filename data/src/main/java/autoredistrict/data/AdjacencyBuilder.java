@@ -1,18 +1,14 @@
 package autoredistrict.data;
 
+import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.prep.PreparedGeometry;
+import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
+import org.locationtech.jts.index.strtree.STRtree;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.LineString;
-import org.locationtech.jts.geom.Polygon;
-import org.locationtech.jts.geom.TopologyException;
-import org.locationtech.jts.geom.prep.PreparedGeometry;
-import org.locationtech.jts.geom.prep.PreparedGeometryFactory;
-import org.locationtech.jts.index.strtree.STRtree;
 
 /**
  * Rook adjacency for a polygon coverage. RDH tract shapes come from Census TIGER, so neighbouring
@@ -23,23 +19,16 @@ import org.locationtech.jts.index.strtree.STRtree;
  * isn't adjacency.
  */
 public final class AdjacencyBuilder {
-
-    /** Shared boundaries shorter than this (metres) are treated as corner contact. */
+    
+    /**
+     * Shared boundaries shorter than this (metres) are treated as corner contact.
+     */
     static final double MIN_SHARED_METRES = 1.0;
     private static final double SNAP = 1e7;
-
+    
     private AdjacencyBuilder() {
     }
-
-    /** Undirected edges with shared lengths, plus each unit's perimeter and outer boundary. */
-    public record Adjacency(int[] a, int[] b, double[] length, double[] perimeter, double[] outer,
-                            int hashedPairs, int fallbackPairs) {
-
-        public int edgeCount() {
-            return a.length;
-        }
-    }
-
+    
     /**
      * @param lonLat    geometries in geographic coordinates, as read from the shapefile
      * @param projected the same geometries projected to metres, vertex for vertex
@@ -79,7 +68,8 @@ public final class AdjacencyBuilder {
                             double[] acc;
                             if (pk == lastKey) {
                                 acc = lastAcc;
-                            } else {
+                            }
+                            else {
                                 acc = shared.computeIfAbsent(pk, x -> new double[1]);
                                 lastKey = pk;
                                 lastAcc = acc;
@@ -101,7 +91,7 @@ public final class AdjacencyBuilder {
             if (len < MIN_SHARED_METRES) {
                 continue;
             }
-            pairs.add(new int[] {(int) (k >>> 32), (int) k});
+            pairs.add(new int[]{(int) (k >>> 32), (int) k});
             lens.add(len);
         }
         int m = pairs.size();
@@ -122,7 +112,7 @@ public final class AdjacencyBuilder {
         }
         return new Adjacency(a, b, len, perimeter, outer, hashed, fallback);
     }
-
+    
     private static int fallbackPairs(List<Geometry> lonLat, List<Geometry> projected, Map<Long, double[]> shared) {
         int n = lonLat.size();
         STRtree tree = new STRtree();
@@ -135,8 +125,7 @@ public final class AdjacencyBuilder {
         for (int i = 0; i < n; i++) {
             Geometry gi = lonLat.get(i);
             PreparedGeometry prepared = null;
-            @SuppressWarnings("unchecked")
-            List<Integer> candidates = tree.query(gi.getEnvelopeInternal());
+            @SuppressWarnings("unchecked") List<Integer> candidates = tree.query(gi.getEnvelopeInternal());
             for (int j : candidates) {
                 if (j <= i || shared.containsKey(pairKey(i, j))) {
                     continue;
@@ -155,15 +144,17 @@ public final class AdjacencyBuilder {
                 }
                 double len = sharedLength(boundaries[i], boundaries[j], projected.get(i));
                 if (len >= MIN_SHARED_METRES) {
-                    shared.put(pairKey(i, j), new double[] {len});
+                    shared.put(pairKey(i, j), new double[]{len});
                     added++;
                 }
             }
         }
         return added;
     }
-
-    /** Length in metres of the overlap of two boundaries; 0 for corner contact. */
+    
+    /**
+     * Length in metres of the overlap of two boundaries; 0 for corner contact.
+     */
     private static double sharedLength(Geometry bi, Geometry bj, Geometry projectedI) {
         Geometry overlap;
         try {
@@ -179,26 +170,38 @@ public final class AdjacencyBuilder {
         double ratio = projectedI.getLength() / Math.max(1e-12, bi.getLength());
         return degLen * ratio;
     }
-
+    
     static long key(Coordinate c) {
         long lon = Math.round((c.x + 200.0) * SNAP);
         long lat = Math.round((c.y + 90.0) * SNAP);
         return (lon << 32) | (lat & 0xffffffffL);
     }
-
+    
     static long pairKey(int i, int j) {
         int lo = Math.min(i, j);
         int hi = Math.max(i, j);
         return ((long) lo << 32) | (hi & 0xffffffffL);
     }
-
-    /** Open-addressing hash of segments (two packed endpoints) to the first unit that had it. */
+    
+    /**
+     * Undirected edges with shared lengths, plus each unit's perimeter and outer boundary.
+     */
+    public record Adjacency(int[] a, int[] b, double[] length, double[] perimeter, double[] outer, int hashedPairs, int fallbackPairs) {
+        
+        public int edgeCount() {
+            return a.length;
+        }
+    }
+    
+    /**
+     * Open-addressing hash of segments (two packed endpoints) to the first unit that had it.
+     */
     private static final class SegmentTable {
         private final long[] ka;
         private final long[] kb;
         private final int[] owner;
         private final int mask;
-
+        
         SegmentTable(long expected) {
             int cap = Integer.highestOneBit((int) Math.min(1L << 30, Math.max(16, expected * 2)) - 1) << 1;
             ka = new long[cap];
@@ -207,7 +210,7 @@ public final class AdjacencyBuilder {
             java.util.Arrays.fill(owner, -1);
             mask = cap - 1;
         }
-
+        
         /**
          * Records the segment for {@code unit}. Returns the other unit if the segment was already
          * recorded by a different one (consuming it), -1 if this is its first sighting.

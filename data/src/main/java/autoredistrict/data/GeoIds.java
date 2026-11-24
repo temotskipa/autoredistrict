@@ -7,14 +7,16 @@ import java.util.Optional;
  * leading zero of state FIPS codes below 10 (Alabama's {@code 01...}), and may add {@code .0}.
  */
 public final class GeoIds {
-
+    
     public static final int TRACT_WIDTH = 11;
     public static final int BLOCK_WIDTH = 15;
-
+    
     private GeoIds() {
     }
-
-    /** Strips whitespace, quotes and a trailing {@code .0}; doesn't pad. */
+    
+    /**
+     * Strips whitespace, quotes and a trailing {@code .0}; doesn't pad.
+     */
     public static String clean(String raw) {
         if (raw == null) {
             throw new DataException("Some rows have no GEOID.");
@@ -31,7 +33,7 @@ public final class GeoIds {
         }
         return s;
     }
-
+    
     /**
      * Zero-pads a GEOID that is one digit short of the tract or block width, which is what a
      * numeric read of a state FIPS below 10 produces. Other widths are returned unchanged.
@@ -43,18 +45,21 @@ public final class GeoIds {
         }
         return s;
     }
-
-    /** Pads a block GEOID to 15 characters; fails on anything else. */
+    
+    /**
+     * Pads a block GEOID to 15 characters; fails on anything else.
+     */
     public static String block(String raw, String source) {
         String s = normalize(raw);
         if (s.length() != BLOCK_WIDTH || !s.chars().allMatch(Character::isDigit)) {
-            throw new DataException(source + " has a block GEOID20 '" + raw
-                    + "' that isn't a 14- or 15-digit block code.");
+            throw new DataException(source + " has a block GEOID20 '" + raw + "' that isn't a 14- or 15-digit block code.");
         }
         return s;
     }
-
-    /** "tract" for 11 digits, "block" for 15, empty otherwise. */
+    
+    /**
+     * "tract" for 11 digits, "block" for 15, empty otherwise.
+     */
     public static Optional<String> resolutionForWidth(int width) {
         return switch (width) {
             case TRACT_WIDTH -> Optional.of("tract");

@@ -1,10 +1,6 @@
 package autoredistrict.data;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -27,49 +23,13 @@ import java.util.Set;
  * </ul>
  */
 public final class BlockVotes {
-
+    
     private BlockVotes() {
     }
-
-    /** Which presidential race. */
-    public enum Election {
-        Y2024("2024"), Y2020("2020");
-
-        private final String label;
-
-        Election(String label) {
-            this.label = label;
-        }
-
-        public String label() {
-            return label;
-        }
-
-        public static Election parse(String s) {
-            return switch (s.strip()) {
-                case "2024" -> Y2024;
-                case "2020" -> Y2020;
-                default -> throw new DataException("Unknown election '" + s + "'. Use 2024 or 2020.");
-            };
-        }
-    }
-
-    /** D and R votes per tract GEOID for one state and election, with coverage counts. */
-    public record TractVotes(Election election, String source, Map<String, double[]> byTract,
-                             double dem, double rep, long blocks, long blocksOutside, double totPop) {
-
-        public double demShare() {
-            double t = dem + rep;
-            return t > 0 ? dem / t : 0.5;
-        }
-
-        /** Tracts in {@code tracts} with no block in the vote file. */
-        public long tractsMissing(List<String> tracts) {
-            return tracts.stream().filter(t -> !byTract.containsKey(t)).count();
-        }
-    }
-
-    /** Reads a 2024 per-state block CSV. Blocks outside {@code tracts} are counted, not summed. */
+    
+    /**
+     * Reads a 2024 per-state block CSV. Blocks outside {@code tracts} are counted, not summed.
+     */
     public static TractVotes read2024(InputStream csv, String source, String stateFips, Set<String> tracts) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(csv, StandardCharsets.UTF_8), 1 << 16)) {
             List<String> header = Csv.header(reader, source);
@@ -84,23 +44,20 @@ public final class BlockVotes {
                 throw new DataException(source + " has no GEOID20 column.");
             }
             if (dem < 0 || rep < 0) {
-                throw new DataException(source + " has neither G24PREDHAR/G24PRERTRU nor PREDEM24/PREREP24 "
-                        + "presidential columns.");
+                throw new DataException(source + " has neither G24PREDHAR/G24PRERTRU nor PREDEM24/PREREP24 " + "presidential columns.");
             }
-            return sum(reader, source, Election.Y2024, geoid, dem, rep, -1, stateFips, null, tracts)
-                    .get(stateFips);
+            return sum(reader, source, Election.Y2024, geoid, dem, rep, -1, stateFips, null, tracts).get(stateFips);
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read " + source, e);
         }
     }
-
+    
     /**
      * Reads the 2020 national block file once for several states.
      *
      * @param tractsByFips the tract GEOIDs of each state to keep, by state FIPS
      */
-    public static Map<String, TractVotes> readNational2020(InputStream csv, String source,
-                                                           Map<String, Set<String>> tractsByFips) {
+    public static Map<String, TractVotes> readNational2020(InputStream csv, String source, Map<String, Set<String>> tractsByFips) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(csv, StandardCharsets.UTF_8), 1 << 16)) {
             List<String> header = Csv.header(reader, source);
             int geoid = Csv.indexOf(header, "GEOID20");
@@ -115,12 +72,9 @@ public final class BlockVotes {
             throw new UncheckedIOException("Could not read " + source, e);
         }
     }
-
-    private static Map<String, TractVotes> sum(BufferedReader reader, String source, Election election,
-                                               int geoidCol, int demCol, int repCol, int popCol,
-                                               String onlyFips, Map<String, Set<String>> tractsByFips,
-                                               Set<String> onlyTracts) throws IOException {
-        int[] cols = popCol >= 0 ? new int[] {geoidCol, demCol, repCol, popCol} : new int[] {geoidCol, demCol, repCol};
+    
+    private static Map<String, TractVotes> sum(BufferedReader reader, String source, Election election, int geoidCol, int demCol, int repCol, int popCol, String onlyFips, Map<String, Set<String>> tractsByFips, Set<String> onlyTracts) throws IOException {
+        int[] cols = popCol >= 0 ? new int[]{geoidCol, demCol, repCol, popCol} : new int[]{geoidCol, demCol, repCol};
         int[] order = cols.clone();
         java.util.Arrays.sort(order);
         int[] pos = new int[cols.length];
@@ -144,7 +98,8 @@ public final class BlockVotes {
             Set<String> tracts;
             if (onlyFips != null) {
                 tracts = onlyTracts;
-            } else {
+            }
+            else {
                 tracts = tractsByFips.get(fips);
                 if (tracts == null) {
                     continue; // a state we aren't importing (or DC)
@@ -178,14 +133,69 @@ public final class BlockVotes {
                 }
             }
             out.put(onlyFips, acc.result(election, source));
-        } else {
+        }
+        else {
             for (String fips : tractsByFips.keySet()) {
                 out.put(fips, accs.getOrDefault(fips, new Acc()).result(election, source));
             }
         }
         return out;
     }
-
+    
+    /**
+     * Opens the CSV inside an RDH vote zip.
+     */
+    public static InputStream openCsv(Path zip) {
+        try {
+            return RdhTractImporter.openZipMember(zip, ".csv");
+        } catch (IOException e) {
+            throw new UncheckedIOException("Could not open " + zip, e);
+        }
+    }
+    
+    /**
+     * Which presidential race.
+     */
+    public enum Election {
+        Y2024("2024"), Y2020("2020");
+        
+        private final String label;
+        
+        Election(String label) {
+            this.label = label;
+        }
+        
+        public static Election parse(String s) {
+            return switch (s.strip()) {
+                case "2024" -> Y2024;
+                case "2020" -> Y2020;
+                default -> throw new DataException("Unknown election '" + s + "'. Use 2024 or 2020.");
+            };
+        }
+        
+        public String label() {
+            return label;
+        }
+    }
+    
+    /**
+     * D and R votes per tract GEOID for one state and election, with coverage counts.
+     */
+    public record TractVotes(Election election, String source, Map<String, double[]> byTract, double dem, double rep, long blocks, long blocksOutside, double totPop) {
+        
+        public double demShare() {
+            double t = dem + rep;
+            return t > 0 ? dem / t : 0.5;
+        }
+        
+        /**
+         * Tracts in {@code tracts} with no block in the vote file.
+         */
+        public long tractsMissing(List<String> tracts) {
+            return tracts.stream().filter(t -> !byTract.containsKey(t)).count();
+        }
+    }
+    
     private static final class Acc {
         final Map<String, double[]> byTract = new HashMap<>();
         double dem;
@@ -193,18 +203,9 @@ public final class BlockVotes {
         long blocks;
         long outside;
         double totPop;
-
+        
         TractVotes result(Election e, String source) {
             return new TractVotes(e, source, byTract, dem, rep, blocks, outside, totPop);
-        }
-    }
-
-    /** Opens the CSV inside an RDH vote zip. */
-    public static InputStream openCsv(Path zip) {
-        try {
-            return RdhTractImporter.openZipMember(zip, ".csv");
-        } catch (IOException e) {
-            throw new UncheckedIOException("Could not open " + zip, e);
         }
     }
 }

@@ -6,13 +6,17 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
-/** Minimal streaming CSV support (RFC 4180 quoting), enough for RDH files and our cache. */
+/**
+ * Minimal streaming CSV support (RFC 4180 quoting), enough for RDH files and our cache.
+ */
 public final class Csv {
-
+    
     private Csv() {
     }
-
-    /** Splits one CSV record. Quoted fields may contain commas and doubled quotes. */
+    
+    /**
+     * Splits one CSV record. Quoted fields may contain commas and doubled quotes.
+     */
     public static List<String> split(String line) {
         List<String> out = new ArrayList<>();
         StringBuilder field = new StringBuilder();
@@ -24,25 +28,30 @@ public final class Csv {
                     if (i + 1 < line.length() && line.charAt(i + 1) == '"') {
                         field.append('"');
                         i++;
-                    } else {
+                    }
+                    else {
                         quoted = false;
                     }
-                } else {
+                }
+                else {
                     field.append(c);
                 }
-            } else if (c == '"') {
+            }
+            else if (c == '"') {
                 quoted = true;
-            } else if (c == ',') {
+            }
+            else if (c == ',') {
                 out.add(field.toString());
                 field.setLength(0);
-            } else {
+            }
+            else {
                 field.append(c);
             }
         }
         out.add(field.toString());
         return out;
     }
-
+    
     /**
      * Extracts the given columns from a record without building the whole field list. Returns
      * false when the record has fewer columns than needed. {@code wanted} must be sorted ascending.
@@ -76,7 +85,8 @@ public final class Csv {
                     i++;
                 }
                 value = sb.toString();
-            } else {
+            }
+            else {
                 while (i < len && line.charAt(i) != ',') {
                     i++;
                 }
@@ -90,8 +100,10 @@ public final class Csv {
         }
         return w == wanted.length;
     }
-
-    /** Index of the first header matching one of the names, case-insensitively; -1 if none. */
+    
+    /**
+     * Index of the first header matching one of the names, case-insensitively; -1 if none.
+     */
     public static int indexOf(List<String> header, String... names) {
         for (String name : names) {
             for (int i = 0; i < header.size(); i++) {
@@ -102,8 +114,10 @@ public final class Csv {
         }
         return -1;
     }
-
-    /** Reads the header line, stripping a UTF-8 BOM. */
+    
+    /**
+     * Reads the header line, stripping a UTF-8 BOM.
+     */
     public static List<String> header(BufferedReader reader, String source) throws IOException {
         String line = reader.readLine();
         if (line == null) {
@@ -114,8 +128,10 @@ public final class Csv {
         }
         return split(line);
     }
-
-    /** Parses a number field; blank means 0. */
+    
+    /**
+     * Parses a number field; blank means 0.
+     */
     public static double number(String field, String column, String source) {
         String s = field == null ? "" : field.strip();
         if (s.isEmpty()) {
@@ -127,8 +143,10 @@ public final class Csv {
             throw new DataException(source + " has a non-numeric value '" + s + "' in " + column + ".");
         }
     }
-
-    /** Quotes a value for writing if it needs it. */
+    
+    /**
+     * Quotes a value for writing if it needs it.
+     */
     public static String quote(String value) {
         if (value == null) {
             return "";
@@ -138,8 +156,10 @@ public final class Csv {
         }
         return '"' + value.replace("\"", "\"\"") + '"';
     }
-
-    /** Formats a double compactly and without locale surprises. */
+    
+    /**
+     * Formats a double compactly and without locale surprises.
+     */
     public static String num(double v) {
         if (v == Math.rint(v) && Math.abs(v) < 1e15) {
             return Long.toString((long) v);
