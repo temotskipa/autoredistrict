@@ -12,7 +12,7 @@ import java.util.Objects;
  * callers must not modify them.
  */
 public final class Graph {
-
+    
     private final int n;
     private final int[] pop;
     private final double[] dem;
@@ -27,9 +27,8 @@ public final class Graph {
     private final long totalPop;
     private final double totalArea;
     private final int maxDegree;
-
-    private Graph(int[] pop, double[] dem, double[] rep, double[] x, double[] y, double[] area,
-                  double[] outer, int[] offsets, int[] neighbors, double[] edgeLength) {
+    
+    private Graph(int[] pop, double[] dem, double[] rep, double[] x, double[] y, double[] area, double[] outer, int[] offsets, int[] neighbors, double[] edgeLength) {
         this.n = pop.length;
         this.pop = pop;
         this.dem = dem;
@@ -53,16 +52,14 @@ public final class Graph {
         this.totalArea = a;
         this.maxDegree = md;
     }
-
+    
     /**
      * Builds a graph from per-unit arrays and an undirected edge list. Duplicate edges are merged
      * (lengths summed) and self loops are rejected.
      */
-    public static Graph of(int[] pop, double[] dem, double[] rep, double[] x, double[] y,
-                           double[] area, double[] outer, int[] edgeA, int[] edgeB,
-                           double[] edgeLen) {
+    public static Graph of(int[] pop, double[] dem, double[] rep, double[] x, double[] y, double[] area, double[] outer, int[] edgeA, int[] edgeB, double[] edgeLen) {
         int n = pop.length;
-        for (double[] arr : new double[][] {dem, rep, x, y, area, outer}) {
+        for (double[] arr : new double[][]{dem, rep, x, y, area, outer}) {
             if (arr.length != n) {
                 throw new IllegalArgumentException("per-unit arrays must all have length " + n);
             }
@@ -109,7 +106,8 @@ public final class Graph {
             for (int j = s; j < t; j++) {
                 if (w > outOff[i] && nbr[w - 1] == nbr[j]) {
                     len[w - 1] += len[j];
-                } else {
+                }
+                else {
                     nbr[w] = nbr[j];
                     len[w] = len[j];
                     w++;
@@ -117,10 +115,9 @@ public final class Graph {
             }
         }
         outOff[n] = w;
-        return new Graph(pop.clone(), dem.clone(), rep.clone(), x.clone(), y.clone(), area.clone(),
-                outer.clone(), outOff, Arrays.copyOf(nbr, w), Arrays.copyOf(len, w));
+        return new Graph(pop.clone(), dem.clone(), rep.clone(), x.clone(), y.clone(), area.clone(), outer.clone(), outOff, Arrays.copyOf(nbr, w), Arrays.copyOf(len, w));
     }
-
+    
     private static void sortPairs(int[] keys, double[] vals, int from, int to) {
         for (int i = from + 1; i < to; i++) {
             int k = keys[i];
@@ -135,56 +132,58 @@ public final class Graph {
             vals[j + 1] = v;
         }
     }
-
+    
     public int size() {
         return n;
     }
-
+    
     public int pop(int i) {
         return pop[i];
     }
-
+    
     public double dem(int i) {
         return dem[i];
     }
-
+    
     public double rep(int i) {
         return rep[i];
     }
-
+    
     public double x(int i) {
         return x[i];
     }
-
+    
     public double y(int i) {
         return y[i];
     }
-
+    
     public double area(int i) {
         return area[i];
     }
-
-    /** Length of the unit's boundary that borders no other unit (coast, state line). */
+    
+    /**
+     * Length of the unit's boundary that borders no other unit (coast, state line).
+     */
     public double outer(int i) {
         return outer[i];
     }
-
+    
     public int degree(int i) {
         return offsets[i + 1] - offsets[i];
     }
-
+    
     public int maxDegree() {
         return maxDegree;
     }
-
+    
     public long totalPop() {
         return totalPop;
     }
-
+    
     public double totalArea() {
         return totalArea;
     }
-
+    
     public double totalDem() {
         double s = 0;
         for (double d : dem) {
@@ -192,7 +191,7 @@ public final class Graph {
         }
         return s;
     }
-
+    
     public double totalRep() {
         double s = 0;
         for (double r : rep) {
@@ -200,41 +199,49 @@ public final class Graph {
         }
         return s;
     }
-
-    /** Number of undirected edges. */
+    
+    /**
+     * Number of undirected edges.
+     */
     public int edgeCount() {
         return neighbors.length / 2;
     }
-
+    
     // Raw CSR access for the hot loop.
-
+    
     int[] offsets() {
         return offsets;
     }
-
+    
     int[] neighbors() {
         return neighbors;
     }
-
+    
     double[] edgeLengths() {
         return edgeLength;
     }
-
+    
     int[] popArray() {
         return pop;
     }
-
-    /** Neighbour list of unit {@code i} as a fresh array (not for hot loops). */
+    
+    /**
+     * Neighbour list of unit {@code i} as a fresh array (not for hot loops).
+     */
     public int[] neighborsOf(int i) {
         return Arrays.copyOfRange(neighbors, offsets[i], offsets[i + 1]);
     }
-
-    /** Shared boundary lengths parallel to {@link #neighborsOf(int)}. */
+    
+    /**
+     * Shared boundary lengths parallel to {@link #neighborsOf(int)}.
+     */
     public double[] edgeLengthsOf(int i) {
         return Arrays.copyOfRange(edgeLength, offsets[i], offsets[i + 1]);
     }
-
-    /** Labels connected components; returns the number of components. */
+    
+    /**
+     * Labels connected components; returns the number of components.
+     */
     public int components(int[] label) {
         Arrays.fill(label, -1);
         int[] queue = new int[n];
