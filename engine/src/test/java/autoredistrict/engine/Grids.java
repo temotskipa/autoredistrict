@@ -6,14 +6,43 @@ import java.util.List;
 import java.util.SplittableRandom;
 import java.util.function.IntToDoubleFunction;
 
-/** Synthetic lattice graphs and a simple contiguous starting map for engine tests. */
+/**
+ * Synthetic lattice graphs and a simple contiguous starting map for engine tests.
+ */
 final class Grids {
-
+    
     static final double CELL = 1000.0;
-
+    /**
+     * Multi-source BFS from k random seed units: contiguous and deliberately uneven.
+     */
+    static final InitialMap BFS_VORONOI = (g, k, rng) -> {
+        int n = g.size();
+        int[] a = new int[n];
+        Arrays.fill(a, -1);
+        ArrayDeque<Integer> q = new ArrayDeque<>();
+        int placed = 0;
+        while (placed < k) {
+            int s = rng.nextInt(n);
+            if (a[s] < 0) {
+                a[s] = placed++;
+                q.add(s);
+            }
+        }
+        while (!q.isEmpty()) {
+            int u = q.poll();
+            for (int v : g.neighborsOf(u)) {
+                if (a[v] < 0) {
+                    a[v] = a[u];
+                    q.add(v);
+                }
+            }
+        }
+        return a;
+    };
+    
     private Grids() {
     }
-
+    
     /**
      * A w x h rook lattice of 1 km cells, each with population {@code pop} and D share given by
      * {@code demShare(index)} over 100 votes.
@@ -57,34 +86,10 @@ final class Grids {
         }
         return Graph.of(p, dem, rep, x, y, area, outer, ea, eb, el);
     }
-
-    /** Multi-source BFS from k random seed units: contiguous and deliberately uneven. */
-    static final InitialMap BFS_VORONOI = (g, k, rng) -> {
-        int n = g.size();
-        int[] a = new int[n];
-        Arrays.fill(a, -1);
-        ArrayDeque<Integer> q = new ArrayDeque<>();
-        int placed = 0;
-        while (placed < k) {
-            int s = rng.nextInt(n);
-            if (a[s] < 0) {
-                a[s] = placed++;
-                q.add(s);
-            }
-        }
-        while (!q.isEmpty()) {
-            int u = q.poll();
-            for (int v : g.neighborsOf(u)) {
-                if (a[v] < 0) {
-                    a[v] = a[u];
-                    q.add(v);
-                }
-            }
-        }
-        return a;
-    };
-
-    /** Full BFS: is district d connected when unit skip is removed? */
+    
+    /**
+     * Full BFS: is district d connected when unit skip is removed?
+     */
     static boolean connectedWithout(Graph g, int[] assign, int d, int skip) {
         int start = -1;
         int size = 0;
@@ -113,15 +118,11 @@ final class Grids {
         }
         return reached == size;
     }
-
+    
     static Schedule schedule(long perPhase) {
-        return new Schedule(List.of(
-                new Phase("shape", perPhase, new Weights(1, 50, 2, 0), 0.5, 1e-3, 1.0),
-                new Phase("explore", perPhase, new Weights(1, 20, 0.5, 0.3), 0.8, 1e-2, 0.25),
-                new Phase("elect", 2 * perPhase, new Weights(1, 20, 2, 1), 0.5, 1e-4, 1.0)),
-                4 * perPhase, null);
+        return new Schedule(List.of(new Phase("shape", perPhase, new Weights(1, 50, 2, 0), 0.5, 1e-3, 1.0, false), new Phase("explore", perPhase, new Weights(1, 20, 0.5, 0.3), 0.8, 1e-2, 0.25, false), new Phase("elect", 2 * perPhase, new Weights(1, 20, 2, 1), 0.5, 1e-4, 1.0, true)), 4 * perPhase, null);
     }
-
+    
     static SplittableRandom rng(long seed) {
         return new SplittableRandom(seed);
     }

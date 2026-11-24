@@ -31,6 +31,12 @@ public final class SingleFlip implements MoveKernel {
             return false;
         }
         if (!d.removalKeepsConnected(u)) {
+            // u is a cut vertex. If what it cuts off is small, try taking it along.
+            if (d.tryPieceMove(u, b, t, rng)) {
+                stats.accepted++;
+                stats.pieceMoves++;
+                return true;
+            }
             return false;
         }
         d.commit();

@@ -9,6 +9,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.StructuredTaskScope.Joiner;
 import java.util.concurrent.StructuredTaskScope.Subtask;
+import java.util.concurrent.StructuredTaskScope.Subtask.State;
 import java.util.function.Predicate;
 
 /**
@@ -18,16 +19,20 @@ import java.util.function.Predicate;
  * GUI's Cancel button relies on that.
  */
 public final class Annealer {
-
+    
     private Annealer() {
     }
-
-    /** Default chains per request: the number of cores, capped at 16. */
+    
+    /**
+     * Default chains per request: the number of cores, capped at 16.
+     */
     public static int defaultSeeds() {
-        return Math.max(1, Math.min(16, Runtime.getRuntime().availableProcessors()));
+        return Math.clamp(Runtime.getRuntime().availableProcessors(), 1, 16);
     }
-
-    /** Seeds {@code base, base+1, ...}. */
+    
+    /**
+     * Seeds {@code base, base+1, ...}.
+     */
     public static long[] seeds(long base, int count) {
         long[] s = new long[count];
         for (int i = 0; i < count; i++) {
@@ -35,13 +40,13 @@ public final class Annealer {
         }
         return s;
     }
-
-    /** Runs every chain to the end; results are in seed order. */
-    public static List<ChainResult> runAll(Graph g, Target target, Schedule schedule, InitialMap initial,
-                                           long[] seeds, Progress.Listener listener) throws InterruptedException {
+    
+    /**
+     * Runs every chain to the end; results are in seed order.
+     */
+    public static List<ChainResult> runAll(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener) throws InterruptedException {
         Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()));
-        try (var scope = StructuredTaskScope.open(Joiner.<ChainResult>allSuccessfulOrThrow(),
-                cfg -> cfg.withName("anneal").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
+        try (var scope = StructuredTaskScope.open(Joiner.<ChainResult>allSuccessfulOrThrow(), cfg -> cfg.withName("anneal").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
             for (int i = 0; i < seeds.length; i++) {
                 int index = i;
                 scope.fork(() -> runLimited(cores, g, target, schedule, initial, seeds[index], index, listener));
@@ -53,19 +58,15 @@ public final class Annealer {
             throw rethrow(e.getCause());
         }
     }
-
+    
     /**
      * Runs the chains until one finishes with a result {@code stop} accepts, then cancels the
      * rest (structured concurrency's {@code Joiner.allUntil}). Returns the chains that finished.
      */
-    public static List<ChainResult> runUntil(Graph g, Target target, Schedule schedule, InitialMap initial,
-                                             long[] seeds, Progress.Listener listener, Predicate<ChainResult> stop)
-            throws InterruptedException {
+    public static List<ChainResult> runUntil(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener, Predicate<ChainResult> stop) throws InterruptedException {
         Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()));
         List<Subtask<ChainResult>> done;
-        try (var scope = StructuredTaskScope.open(
-                Joiner.<ChainResult>allUntil(t -> t.state() == Subtask.State.SUCCESS && stop.test(t.get())),
-                cfg -> cfg.withName("anneal-until").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
+        try (var scope = StructuredTaskScope.open(Joiner.<ChainResult>allUntil(t -> t.state() == State.SUCCESS && stop.test(t.get())), cfg -> cfg.withName("anneal-until").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
             for (int i = 0; i < seeds.length; i++) {
                 int index = i;
                 scope.fork(() -> runLimited(cores, g, target, schedule, initial, seeds[index], index, listener));
@@ -82,16 +83,15 @@ public final class Annealer {
                         throw rethrow(ex);
                     }
                 }
-                case UNAVAILABLE -> { }
+                case UNAVAILABLE -> {
+                }
             }
         }
         results.sort(Comparator.comparingInt(ChainResult::chain));
         return results;
     }
-
-    private static ChainResult runLimited(Semaphore cores, Graph g, Target target, Schedule schedule,
-                                          InitialMap initial, long seed, int index, Progress.Listener listener)
-            throws InterruptedException {
+    
+    private static ChainResult runLimited(Semaphore cores, Graph g, Target target, Schedule schedule, InitialMap initial, long seed, int index, Progress.Listener listener) throws InterruptedException {
         cores.acquire();
         try {
             return Chain.run(g, target, schedule, initial, SingleFlip.INSTANCE, seed, index, listener);
@@ -99,13 +99,14 @@ public final class Annealer {
             cores.release();
         }
     }
-
-    /** The best result: population valid, then hit, then lowest score. */
+    
+    /**
+     * The best result: population valid, then hit, then lowest score.
+     */
     public static ChainResult best(List<ChainResult> results) {
-        return results.stream().min(ChainResult.BEST)
-                .orElseThrow(() -> new IllegalStateException("no chain finished"));
+        return results.stream().min(ChainResult.BEST).orElseThrow(() -> new IllegalStateException("no chain finished"));
     }
-
+    
     private static RuntimeException rethrow(Throwable t) {
         if (t instanceof RuntimeException r) {
             return r;

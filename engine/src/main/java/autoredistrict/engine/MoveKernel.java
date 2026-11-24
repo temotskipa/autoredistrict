@@ -25,5 +25,7 @@ public interface MoveKernel {
     final class Stats {
         public long proposals;
         public long accepted;
+        /** Accepted moves that carried a cut-off piece along (see Districting#tryPieceMove). */
+        public long pieceMoves;
     }
 }

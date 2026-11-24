@@ -1,18 +1,18 @@
 package autoredistrict.engine;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 import java.util.SplittableRandom;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DistrictingTest {
-
+    
     private static Graph mixedGrid() {
         return Grids.lattice(20, 20, 100, i -> 0.2 + 0.6 * ((i * 37) % 100) / 100.0);
     }
-
+    
     @Test
     void incrementalTalliesMatchFullRecomputationAfterRandomFlips() {
         Graph g = mixedGrid();
@@ -35,7 +35,7 @@ class DistrictingTest {
         }
         assertEquals(g.totalPop(), total, "no phantom voters");
     }
-
+    
     @Test
     void contiguityCheckAgreesWithFullBfs() {
         Graph g = mixedGrid();
@@ -64,7 +64,7 @@ class DistrictingTest {
             assertTrue(Grids.connectedWithout(g, a, k, -1), "district " + k);
         }
     }
-
+    
     @Test
     void populationBoundIsHardOnceADistrictIsInside() {
         // 10x10 grid split into two 5-column halves: both exactly at ideal (500 each of 1000).
@@ -95,12 +95,11 @@ class DistrictingTest {
             }
         }
     }
-
+    
     @Test
     void chainBringsEveryDistrictInsideTheTolerance() {
         Graph g = mixedGrid();
-        ChainResult r = Chain.run(g, new Target(5, 2, 2.0, 0.025), Grids.schedule(40_000), Grids.BFS_VORONOI,
-                SingleFlip.INSTANCE, 5, 0, Progress.Listener.NONE);
+        ChainResult r = Chain.run(g, new Target(5, 2, 2.0, 0.025), Grids.schedule(40_000), Grids.BFS_VORONOI, SingleFlip.INSTANCE, 5, 0, Progress.Listener.NONE);
         assertTrue(r.populationValid(), "max deviation " + r.maxDeviation());
         assertTrue(r.maxDeviation() <= 0.025);
         assertEquals(3, r.phases().size());

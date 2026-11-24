@@ -68,7 +68,18 @@ public final class Districting {
     private final int[] same;
     private final int[] ufp;
     private final int[] act;
+    private final int[] block;
+    private int blockStamp;
+    private final int[] seeds2;
+    private int sameCount;
+
+    /** Largest piece a pruning move carries along with the flipped unit. */
+    static final int MAX_PIECE = 40;
+    private final int[] piece = new int[MAX_PIECE];
+    private int pieceSize = -1;
+    private final int[] moveBuf = new int[MAX_PIECE + 1];
     private int bsize;
+    private boolean hardBound = true;
     private double wPop = 1;
     private double wComp;
     private double wTens;
@@ -175,6 +186,8 @@ public final class Districting {
         this.same = new int[md];
         this.ufp = new int[md];
         this.act = new int[md];
+        this.block = new int[n];
+        this.seeds2 = new int[md];
         recomputeAll();
     }
     
@@ -273,6 +286,11 @@ public final class Districting {
     
     // ---------------------------------------------------------------- configuration
     
+    /** Turns the hard population rule on or off (on by default). */
+    public void setHardBound(boolean on) {
+        this.hardBound = on;
+    }
+
     public void setWeights(Weights weights) {
         this.wPop = weights.population();
         this.wComp = weights.compactness();
@@ -343,10 +361,10 @@ public final class Districting {
         int pu0 = upop[u];
         long na = pop[a] - pu0;
         long nb = pop[b] + pu0;
-        if (inside(pop[a]) && !inside(na)) {
+        if (hardBound && inside(pop[a]) && !inside(na)) {
             return Double.NaN;
         }
-        if (inside(pop[b]) && !inside(nb)) {
+        if (hardBound && inside(pop[b]) && !inside(nb)) {
             return Double.NaN;
         }
         double la = 0;
@@ -502,6 +520,8 @@ public final class Districting {
                 same[m++] = v;
             }
         }
+        sameCount = m;
+        pieceSize = -1;
         if (m <= 1) {
             return true;
         }
@@ -529,26 +549,37 @@ public final class Districting {
         if (groups == 1) {
             return true;
         }
+        nextBlock();
+        block[u] = blockStamp;
+        return seedsConnect(a, same, m, true);
+    }
+
+    /**
+     * Simultaneous BFS inside district {@code a} from each seed, skipping blocked units. Returns
+     * true once all seeds have met. Returns false as soon as one search runs out, which is the
+     * smaller side of the split; with {@code collect}, that side is kept in {@link #piece} if it
+     * has at most {@link #MAX_PIECE} units.
+     */
+    private boolean seedsConnect(int a, int[] seeds, int m, boolean collect) {
         nextStamp();
-        visit[u] = stamp;
         int head = 0;
         int tail = 0;
         for (int i = 0; i < m; i++) {
-            int s = same[i];
+            int s = seeds[i];
             visit[s] = stamp;
             lab[s] = i;
             ufp[i] = i;
             act[i] = 1;
             queue[tail++] = s;
         }
-        groups = m;
+        int groups = m;
         while (head < tail) {
             int x = queue[head++];
             int r = find(lab[x]);
             act[r]--;
             for (int e = off[x]; e < off[x + 1]; e++) {
                 int v = nbr[e];
-                if (v == u || assign[v] != a) {
+                if (block[v] == blockStamp || assign[v] != a) {
                     continue;
                 }
                 if (visit[v] != stamp) {
@@ -569,12 +600,110 @@ public final class Districting {
                 }
             }
             if (act[r] == 0) {
+                if (collect) {
+                    collectPiece(r, tail);
+                }
                 return false;
             }
         }
         return groups == 1;
     }
-    
+
+    private void collectPiece(int root, int tail) {
+        int c = 0;
+        for (int i = 0; i < tail; i++) {
+            int x = queue[i];
+            if (find(lab[x]) == root) {
+                if (c == MAX_PIECE) {
+                    pieceSize = -1;
+                    return;
+                }
+                piece[c++] = x;
+            }
+        }
+        pieceSize = c;
+    }
+
+    /**
+     * After {@link #removalKeepsConnected(int)} returned false for {@code u}: whether the rest of
+     * the district (without {@code u} and the small piece it cuts off) is still connected.
+     */
+    private boolean pieceRemainderConnected(int u) {
+        nextBlock();
+        block[u] = blockStamp;
+        for (int i = 0; i < pieceSize; i++) {
+            block[piece[i]] = blockStamp;
+        }
+        int m = 0;
+        for (int i = 0; i < sameCount; i++) {
+            if (block[same[i]] != blockStamp) {
+                seeds2[m++] = same[i];
+            }
+        }
+        if (m == 0) {
+            return false;
+        }
+        return m == 1 || seedsConnect(assign[u], seeds2, m, false);
+    }
+
+    /**
+     * The pruning move: when flipping {@code u} would cut a small piece (at most
+     * {@link #MAX_PIECE} units) off its district, move {@code u} and that piece to {@code b}
+     * together. Applied as exact single-unit updates, accepted on the summed score change at
+     * temperature {@code t}, and undone exactly if rejected. Without it a district whose whole
+     * boundary consists of cut vertices (a one-tract-wide tail) can never shrink.
+     * Call right after {@code removalKeepsConnected(u)} returned false.
+     */
+    boolean tryPieceMove(int u, int b, double t, SplittableRandom rng) {
+        if (pieceSize <= 0 || !pieceRemainderConnected(u)) {
+            return false;
+        }
+        int a = assign[u];
+        int cnt = 0;
+        moveBuf[cnt++] = u;
+        for (int i = 0; i < pieceSize; i++) {
+            moveBuf[cnt++] = piece[i];
+        }
+        boolean hb = hardBound;
+        hardBound = false;
+        long popA0 = pop[a];
+        long popB0 = pop[b];
+        double total = 0;
+        int moved = 0;
+        for (; moved < cnt; moved++) {
+            double dl = evaluate(moveBuf[moved], b);
+            if (Double.isNaN(dl)) {
+                break;
+            }
+            commit();
+            total += dl;
+        }
+        boolean ok = moved == cnt;
+        if (ok && hb && ((inside(popA0) && !inside(pop[a])) || (inside(popB0) && !inside(pop[b])))) {
+            ok = false;
+        }
+        if (ok && total > 0 && rng.nextDouble() >= Math.exp(-total / t)) {
+            ok = false;
+        }
+        if (!ok) {
+            for (int i = moved - 1; i >= 0; i--) {
+                if (Double.isNaN(evaluate(moveBuf[i], a))) {
+                    throw new IllegalStateException("could not undo a piece move");
+                }
+                commit();
+            }
+        }
+        hardBound = hb;
+        return ok;
+    }
+
+    private void nextBlock() {
+        if (++blockStamp == Integer.MAX_VALUE) {
+            Arrays.fill(block, 0);
+            blockStamp = 1;
+        }
+    }
+
     private int find(int i) {
         while (ufp[i] != i) {
             ufp[i] = ufp[ufp[i]];
