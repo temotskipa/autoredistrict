@@ -13,11 +13,11 @@ dependencies {
 application {
 	applicationName = "autoredistrict-gui"
 	mainClass = "autoredistrict.gui.Launcher"
-    applicationDefaultJvmArgs = JvmFlags.gui
+	applicationDefaultJvmArgs = JvmFlags.gui
 }
 
 tasks.named<JavaExec>("run") {
-    jvmArgs("--enable-native-access=ALL-UNNAMED")
+	jvmArgs("--enable-native-access=ALL-UNNAMED")
 }
 
 // AOT cache (JEP 483/514/515): the start script uses lib/gui.aot when it exists. A cache that
@@ -46,7 +46,7 @@ val installDir = layout.buildDirectory.dir("install/autoredistrict-gui")
 
 // Training run for the AOT cache: the ME snapshot, through the installed start script so the
 // class path matches exactly. Then the start script picks up lib/gui.aot automatically.
-val aotCache by tasks.registering(Exec::class) {
+tasks.register<Exec>("aotCache") {
 	group = "distribution"
 	description = "Builds lib/gui.aot in the installed GUI with a training run (ME snapshot)."
 	dependsOn(tasks.named("installDist"))

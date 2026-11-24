@@ -18,14 +18,16 @@ public final class MapPainter {
     private MapPainter() {
     }
     
-    /** Mixes {@code t} of colour b into colour a. */
+    /**
+     * Mixes {@code t} of colour b into colour a.
+     */
     static int blend(int a, int b, double t) {
         int r = (int) Math.round(((a >> 16) & 0xFF) * (1 - t) + ((b >> 16) & 0xFF) * t);
         int g = (int) Math.round(((a >> 8) & 0xFF) * (1 - t) + ((b >> 8) & 0xFF) * t);
         int bl = (int) Math.round((a & 0xFF) * (1 - t) + (b & 0xFF) * t);
         return 0xFF000000 | (r << 16) | (g << 8) | bl;
     }
-
+    
     /**
      * D share to colour: red below 50%, blue above, saturating 20 points from even.
      */

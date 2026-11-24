@@ -104,7 +104,7 @@ class DistrictingTest {
         assertTrue(r.maxDeviation() <= 0.025);
         assertEquals(3, r.phases().size());
     }
-
+    
     @Test
     void pruningMoveTakesAOneTractWideTailAlong() {
         // District 0: the left half plus a tail along the top row to the right edge (like El Paso's

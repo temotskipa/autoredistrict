@@ -1,8 +1,8 @@
 package autoredistrict.service;
 
-import java.util.ArrayDeque;
-
 import autoredistrict.engine.Graph;
+
+import java.util.ArrayDeque;
 
 /**
  * Cosmetic clean-up after the anneal: a tract with no people and no votes (water, parks) moves
@@ -12,11 +12,13 @@ import autoredistrict.engine.Graph;
  * total, so seat results and the PASS checks are unaffected.
  */
 public final class EmptyTractCleanup {
-
+    
     private EmptyTractCleanup() {
     }
-
-    /** Reassigns empty tracts in place; returns how many moved. */
+    
+    /**
+     * Reassigns empty tracts in place; returns how many moved.
+     */
     public static int apply(Graph g, int[] assign, int k) {
         int n = g.size();
         int[] count = new int[k];
@@ -62,7 +64,7 @@ public final class EmptyTractCleanup {
         }
         return moved;
     }
-
+    
     private static boolean connectedWithout(Graph g, int[] assign, int d, int skip) {
         int start = -1;
         int size = 0;

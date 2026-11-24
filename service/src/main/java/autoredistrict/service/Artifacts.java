@@ -30,11 +30,12 @@ public final class Artifacts {
     public static MapData mapData(PlanResult r, StateDataset ds) {
         String title = String.format(Locale.ROOT, "%s (%s) — %d district%s", r.state().name(), r.state().abbr(), r.districts(), r.districts() == 1 ? " (at-large)" : "s");
         String subtitle = String.format(Locale.ROOT, "requested %d D%s · won %s · %s · max dev %.2f%% · closest margin %.1f pts · %s votes", r.demRequested(), r.proportionalDefault() ? " (proportional)" : "", MapRenderer.seats(r.metrics().demWon(), r.metrics().repWon()), r.hit() ? "hit" : "miss", r.metrics().maxDeviation() * 100, r.metrics().closestMargin(), r.voteData());
-        return MapData.of(title, subtitle, ds.geometry(), r.assignment(), r.districts(), r.metrics().demShares(),
-                populatedExtent(ds), emptyTracts(ds));
+        return MapData.of(title, subtitle, ds.geometry(), r.assignment(), r.districts(), r.metrics().demShares(), populatedExtent(ds), emptyTracts(ds));
     }
-
-    /** Tracts with no people. */
+    
+    /**
+     * Tracts with no people.
+     */
     public static boolean[] emptyTracts(StateDataset ds) {
         boolean[] e = new boolean[ds.size()];
         for (int i = 0; i < e.length; i++) {
@@ -42,8 +43,10 @@ public final class Artifacts {
         }
         return e;
     }
-
-    /** Extent of the tracts with people in them. */
+    
+    /**
+     * Extent of the tracts with people in them.
+     */
     public static org.locationtech.jts.geom.Envelope populatedExtent(StateDataset ds) {
         org.locationtech.jts.geom.Envelope e = new org.locationtech.jts.geom.Envelope();
         for (int i = 0; i < ds.size(); i++) {

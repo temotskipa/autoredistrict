@@ -23,11 +23,11 @@ Monte Carlo simulated anneal that flips one unit at a time. Census tracts take t
    "statistical surface tension") and flip it to a neighbouring district. Keep it if the score improves, or with
    probability exp(-delta/T) if it gets worse.
 3. **Score** (lower is better), each term averaged over the districts:
-   - population: the video's fourth-power spread of district populations;
-   - compactness: each district's moment of inertia about its weighted centre, normalised by weight times area;
-   - surface tension: boundary length shared with other districts;
-   - election fit: districts sorted by D share; the top N must reach 50% + margin/2 and the rest stay below
-     50% - margin/2. The penalty is the squared distance outside those bands, so districts near 50% carry the weight.
+	- population: the video's fourth-power spread of district populations;
+	- compactness: each district's moment of inertia about its weighted centre, normalised by weight times area;
+	- surface tension: boundary length shared with other districts;
+	- election fit: districts sorted by D share; the top N must reach 50% + margin/2 and the rest stay below
+	  50% - margin/2. The penalty is the squared distance outside those bands, so districts near 50% carry the weight.
 4. **Contiguity**: a flip that would split the district it leaves is rejected, checked with a fast neighbour test and
    otherwise a bounded simultaneous BFS. If the flip would only cut off a small piece (up to 40 tracts), the tract and
    that piece can move together, so a district with a one-tract-wide tail can still shrink.
@@ -65,9 +65,9 @@ census.gov blocks some regions (Cloudflare 403), so all geography and votes come
 
 1. **Tracts with population**: RDH's 2020 PL 94-171 tract shapefile for each state, `xx_pl2020_t.zip` (50 files).
 2. **Votes**:
-   - `xx_2024_gen_2020_blocks_csv.zip`, "2024 General Election Results Disaggregated to the 2020 Block", for every
-     state except California (RDH has only precinct results for CA in 2024);
-   - `national_block_2020_pres_results.zip`, "2020 Presidential Results on Nationwide 2020 Census Blocks".
+	- `xx_2024_gen_2020_blocks_csv.zip`, "2024 General Election Results Disaggregated to the 2020 Block", for every
+	  state except California (RDH has only precinct results for CA in 2024);
+	- `national_block_2020_pres_results.zip`, "2020 Presidential Results on Nationwide 2020 Census Blocks".
 
 The vote data is precinct-level: RDH splits each precinct's votes among its blocks by voting-age population, and
 autoredistrict sums the blocks to tracts. Each tract therefore has its own D and R totals, so the engine can separate
@@ -94,23 +94,23 @@ only the cache.
 & $ar seat-range NC --out-dir out\seat-range
 ```
 
-| Command | What it does |
-|---|---|
-| `import --rdh-dir DIR [--states ME,NC]` | Import RDH downloads into the cache. |
-| `run ST` | Draw one map; prints the result and the district table, writes PNG, JSON report, assignment CSV, GeoJSON and a shapefile. |
-| `all` | Every imported state at its proportional default: per-state maps and reports, `summary.csv`, `summary.md` and `contact-sheet.png`. A state that fails is recorded and the batch goes on. |
-| `seat-range ST` | Request the proportional count, then step one seat at a time in each direction until a request misses. A hit also has to meet the PASS rules. |
+| Command                                 | What it does                                                                                                                                                                             |
+|-----------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `import --rdh-dir DIR [--states ME,NC]` | Import RDH downloads into the cache.                                                                                                                                                     |
+| `run ST`                                | Draw one map; prints the result and the district table, writes PNG, JSON report, assignment CSV, GeoJSON and a shapefile.                                                                |
+| `all`                                   | Every imported state at its proportional default: per-state maps and reports, `summary.csv`, `summary.md` and `contact-sheet.png`. A state that fails is recorded and the batch goes on. |
+| `seat-range ST`                         | Request the proportional count, then step one seat at a time in each direction until a request misses. A hit also has to meet the PASS rules.                                            |
 
 Options for `run`, `all` and `seat-range`:
 
-| Option | Default | Meaning |
-|---|---|---|
-| `--dem-seats N` | proportional | Democratic seats to deliver, 0..k (`run` only). |
-| `--min-margin P` | 2.0 | Two-party margin in points each targeted district should clear: D seats aim for 50% + P/2, R seats for 50% - P/2. |
-| `--seeds S` | cores, max 16 | Chains run in parallel per request; the best is kept. A request hits if its best chain hits. |
-| `--seed X` | 1 | Seed of chain 0; chain i uses X + i. Runs are reproducible. |
-| `--election 2024\|2020` | 2024 | Presidential race used for votes. California falls back to 2020 and says so in the output and tables. |
-| `--scale F` | 1.0 | Multiplies the step counts. |
+| Option                  | Default       | Meaning                                                                                                           |
+|-------------------------|---------------|-------------------------------------------------------------------------------------------------------------------|
+| `--dem-seats N`         | proportional  | Democratic seats to deliver, 0..k (`run` only).                                                                   |
+| `--min-margin P`        | 2.0           | Two-party margin in points each targeted district should clear: D seats aim for 50% + P/2, R seats for 50% - P/2. |
+| `--seeds S`             | cores, max 16 | Chains run in parallel per request; the best is kept. A request hits if its best chain hits.                      |
+| `--seed X`              | 1             | Seed of chain 0; chain i uses X + i. Runs are reproducible.                                                       |
+| `--election 2024\|2020` | 2024          | Presidential race used for votes. California falls back to 2020 and says so in the output and tables.             |
+| `--scale F`             | 1.0           | Multiplies the step counts.                                                                                       |
 
 A run **hits** when the D seats won (D share above 50%) equal the request. A plan **passes** when it has the
 apportioned number of districts, every district within 1% of the ideal population, every district contiguous, every
@@ -141,17 +141,17 @@ script uses it when present. On the development machine the window appears in ab
 
 ## Layout
 
-| Module | Contents |
-|---|---|
-| `engine` | Pure Java, no I/O: the `Graph`, the chain state (`Districting`), the single-flip move kernel behind `MoveKernel`, seat-band scoring, the three-phase `Chain` and the parallel `Annealer`. |
-| `data` | RDH import (GeoTools), the per-state Albers equal-area projection, adjacency, connectivity repair, block votes to tracts, the cache, the 2020 apportionment table. |
-| `service` | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts. |
-| `render` | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI. |
-| `cli` | picocli front end. |
-| `gui` | JavaFX front end. |
+| Module    | Contents                                                                                                                                                                                  |
+|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `engine`  | Pure Java, no I/O: the `Graph`, the chain state (`Districting`), the single-flip move kernel behind `MoveKernel`, seat-band scoring, the three-phase `Chain` and the parallel `Annealer`. |
+| `data`    | RDH import (GeoTools), the per-state Albers equal-area projection, adjacency, connectivity repair, block votes to tracts, the cache, the 2020 apportionment table.                        |
+| `service` | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts.                                                                          |
+| `render`  | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI.                                                                                |
+| `cli`     | picocli front end.                                                                                                                                                                        |
+| `gui`     | JavaFX front end.                                                                                                                                                                         |
 
-The engine's hot loop runs on primitive arrays and allocates nothing. JDK 28 features in use: value classes
-(JEP 401, preview) for small immutable types such as points, bounding boxes, edges, weights, targets and result rows;
+The engine's hot loop runs on primitive arrays and allocates nothing. JDK 28 features in use: value classes (JEP 401,
+preview) for small immutable types such as points, bounding boxes, edges, weights, targets and result rows;
 structured concurrency for parallel chains, on platform threads because the work is CPU bound; lazy constants for a
 few tables; ZGC with adaptive heap sizing (`-XX:+UseZGC -XX:+ZAdaptiveHeapSizing`, no `-Xmx`); and the AOT cache.
 

@@ -26,7 +26,8 @@ Elections made-to-order"; README.md describes it.
 - Build with the Gradle wrapper: `.\gradlew.bat test` must pass before a change is done. Tests live in each module's
   `src/test/java`; fixtures are small synthetic files in `src/test/resources` or built by the tests.
 - The toolchain is JDK 28 EA in `~/.jdks`. `--enable-preview` and the launch flags live in `buildSrc` (`JvmFlags`,
-  the `autoredistrict.java-conventions` and `autoredistrict.application-conventions` plugins); don't add them per module.
+  the `autoredistrict.java-conventions` and `autoredistrict.application-conventions` plugins); don't add them per
+  module.
 - Java conventions: standard Java naming, 4-space indents, no wildcard imports in new code, `value record` for small
   immutable types, records for data carriers, primitive arrays in the engine's hot loop (no allocation per step).
 - Keep front ends thin. Logic shared by the GUI and the CLI goes in `service`.

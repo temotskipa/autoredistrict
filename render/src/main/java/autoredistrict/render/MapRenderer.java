@@ -55,7 +55,9 @@ public final class MapRenderer {
             c.fillRect(0, 0, width, height, 0xFFFFFFFF);
             double captionH = 22;
             MapPainter.Viewport vp = MapPainter.Viewport.fit(data.bounds(), 0, captionH, width, height - captionH, 6);
+            g.setClip(0, (int) captionH, width, height - (int) captionH);
             MapPainter.paint(c, data, vp, false, 9);
+            g.setClip(null);
             c.text(caption, 6, 16, MapPainter.TEXT, 13, true, false, false);
         } finally {
             g.dispose();

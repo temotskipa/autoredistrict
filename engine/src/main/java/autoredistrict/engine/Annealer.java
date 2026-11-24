@@ -103,16 +103,7 @@ public final class Annealer {
         results.sort(Comparator.comparingInt(ChainResult::chain));
         return new Until(results, proposals.sum());
     }
-
-    /**
-     * What {@link #runUntil} returns.
-     *
-     * @param finished  the chains whose results are available, in seed order
-     * @param proposals proposals made by every chain, including the cancelled ones
-     */
-    public record Until(List<ChainResult> finished, long proposals) {
-    }
-
+    
     private static ChainResult runLimited(Semaphore cores, Graph g, Target target, Schedule schedule, InitialMap initial, long seed, int index, Progress.Listener listener) throws InterruptedException {
         cores.acquire();
         try {
@@ -137,5 +128,14 @@ public final class Annealer {
             throw e;
         }
         return new IllegalStateException(t);
+    }
+    
+    /**
+     * What {@link #runUntil} returns.
+     *
+     * @param finished  the chains whose results are available, in seed order
+     * @param proposals proposals made by every chain, including the cancelled ones
+     */
+    public record Until(List<ChainResult> finished, long proposals) {
     }
 }
