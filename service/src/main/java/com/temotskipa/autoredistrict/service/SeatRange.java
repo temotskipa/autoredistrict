@@ -45,8 +45,8 @@ public final class SeatRange {
         return s;
     }
     
-    public static Row rowOf(PlanResult r, double tolerance) {
-        return new Row(r.demRequested(), r.metrics().demWon(), r.metrics().repWon(), r.hit(), r.metrics().closestMargin(), r.metrics().maxDeviation(), r.metrics().allContiguous(), r.pass(tolerance), r.voteData(), r.seeds(), r.seconds(), r.flipsPerSecond());
+    public static Row rowOf(PlanResult r) {
+        return new Row(r.demRequested(), r.metrics().demWon(), r.metrics().repWon(), r.hit(), r.metrics().closestMargin(), r.metrics().maxDeviation(), r.metrics().allContiguous(), r.pass(), r.voteData(), r.seeds(), r.seconds(), r.flipsPerSecond());
     }
     
     /**

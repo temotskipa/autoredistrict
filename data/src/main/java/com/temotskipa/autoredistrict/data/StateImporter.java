@@ -94,6 +94,7 @@ public final class StateImporter {
             } catch (IOException e) {
                 throw new UncheckedIOException("Could not read " + votes2024Zip, e);
             }
+            requireVotes(votes, votes2024Zip.getFileName().toString(), s);
             dem = new double[n];
             rep = new double[n];
             fill(votes, layer.geoids(), dem, rep);
@@ -115,6 +116,16 @@ public final class StateImporter {
         TractCache.write(cacheRoot, s, manifest, tracts, edges, simplified, voteInfo == null ? null : Election.Y2024, dem, rep);
         double secs = (System.nanoTime() - t0) / 1e9;
         return new ImportSummary(s, n, layer.totalPopulation(), m, repair.bridges().size(), repair.componentsBefore(), adj.fallbackPairs(), voteInfo == null ? "-" : "2024", voteInfo == null ? 0 : voteInfo.dem(), voteInfo == null ? 0 : voteInfo.rep(), voteInfo == null ? n : voteInfo.tractsMissing(), voteInfo == null ? 0 : voteInfo.blocksOutside(), secs, warnings, null);
+    }
+    
+    /**
+     * A vote file must have some D or R votes in the state's tracts. Otherwise it is the wrong file
+     * (another state's, say), and plans drawn from it would split ties; nothing is cached.
+     */
+    private static void requireVotes(TractVotes v, String file, StateInfo s) {
+        if (v.dem() + v.rep() <= 0) {
+            throw new DataException(file + " has no D or R presidential votes in " + s.abbr() + "'s tracts (" + v.blocks() + " blocks read, " + v.blocksOutside() + " outside them). Check that it is the right file for " + s.abbr() + ".");
+        }
     }
     
     /**
@@ -143,6 +154,7 @@ public final class StateImporter {
             if (v == null || v.blocks() == 0) {
                 throw new DataException(nationalZip.getFileName() + " has no blocks for " + s.abbr() + ".");
             }
+            requireVotes(v, nationalZip.getFileName().toString(), s);
             long pl = 0;
             for (int p : t.pop()) {
                 pl += p;
@@ -172,6 +184,8 @@ public final class StateImporter {
      * failures are recorded in the summary rather than stopping the others.
      */
     public static List<ImportSummary> importAll(Path rdhDir, List<StateInfo> states, Path cacheRoot, int parallel, Consumer<String> log) throws InterruptedException {
+        // Each state imports once: two parallel imports of one state would race on its cache folder.
+        states = List.copyOf(new LinkedHashSet<>(states));
         List<String> missing = RdhFiles.missing(rdhDir, states);
         if (!missing.isEmpty()) {
             throw new MissingFilesException(rdhDir, missing);

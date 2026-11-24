@@ -60,7 +60,7 @@ class PlanServiceTest {
         assertEquals(1, r.metrics().districts());
         assertTrue(java.util.Arrays.stream(r.assignment()).allMatch(d -> d == 0));
         assertEquals(36_000, r.metrics().population());
-        assertTrue(r.pass(PlanOptions.DEFAULT_TOLERANCE));
+        assertTrue(r.pass());
         assertEquals(1, r.demRequested(), "D share 0.6 rounds to the single seat");
         assertTrue(r.hit());
     }
@@ -83,7 +83,7 @@ class PlanServiceTest {
         PlanService svc = new PlanService(tmp);
         StateDataset ds = svc.load(me, Election.Y2024);
         PlanResult r = svc.run(ds, fast(1), Progress.Listener.NONE);
-        assertTrue(r.pass(PlanOptions.DEFAULT_TOLERANCE), "max dev " + r.metrics().maxDeviation());
+        assertTrue(r.pass(), "max dev " + r.metrics().maxDeviation());
         assertTrue(r.hit());
         assertEquals(2, r.metrics().rows().size());
         List<Path> files = Artifacts.write(r, ds, tmp.resolve("out"), "me", true);
@@ -92,7 +92,29 @@ class PlanServiceTest {
         }
         assertTrue(Files.readString(tmp.resolve("out/me.geojson")).contains("\"FeatureCollection\""));
     }
-    
+
+    @Test
+    void reportBatchAndSeatRangeJudgePassWithTheRequestTolerance() throws Exception {
+        StateInfo me = States.require("ME");
+        // 225 equal tracts can't split evenly in two: the best plan is about 0.44% off, inside 1%.
+        SyntheticState.write(tmp, me, 15, 15, 1000);
+        PlanService svc = new PlanService(tmp);
+        StateDataset ds = svc.load(me, Election.Y2024);
+        PlanResult r = svc.run(ds, fast(1), Progress.Listener.NONE);
+        assertTrue(r.pass());
+        assertTrue(r.metrics().maxDeviation() > 1e-6);
+        // The same plan from a request with a 0.0001% tolerance: every view must call it a FAIL.
+        PlanResult strict = new PlanResult(r.state(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), 1e-6, r.voteData(), r.statewideDemShare(), r.metrics(), r.assignment(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.atLarge(), r.timedOut(), r.warnings());
+        assertFalse(strict.pass());
+        Path report = tmp.resolve("strict.json");
+        Artifacts.writeReport(strict, ds, report);
+        var json = com.temotskipa.autoredistrict.data.Json.mapper().readTree(Files.readString(report));
+        assertFalse(json.get("pass").asBoolean());
+        assertEquals(1e-4, json.get("tolerancePct").asDouble(), 1e-12, "the report states the tolerance it used");
+        assertFalse(BatchRunner.row(strict).pass());
+        assertFalse(SeatRange.rowOf(strict).pass());
+    }
+
     @Test
     void seatRangeStepsOutwardAndStopsEachDirectionAtTheFirstMiss() throws InterruptedException {
         List<Integer> asked = new ArrayList<>();

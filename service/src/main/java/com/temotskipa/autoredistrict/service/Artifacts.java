@@ -108,7 +108,7 @@ public final class Artifacts {
     
     public static void writeReport(PlanResult r, StateDataset ds, Path file) {
         PlanMetrics m = r.metrics();
-        Report rep = new Report(r.state().abbr(), r.state().fips(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), r.voteData(), r.statewideDemShare(), m.demWon(), m.repWon(), r.hit(), r.pass(PlanOptions.DEFAULT_TOLERANCE), m.maxDeviation() * 100, m.allContiguous(), m.assignedOnce(), m.populationMatches(), m.population(), m.importedPopulation(), m.closestMargin(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.warnings(), m.rows());
+        Report rep = new Report(r.state().abbr(), r.state().fips(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), r.voteData(), r.statewideDemShare(), m.demWon(), m.repWon(), r.hit(), r.pass(), r.tolerance() * 100, m.maxDeviation() * 100, m.allContiguous(), m.assignedOnce(), m.populationMatches(), m.population(), m.importedPopulation(), m.closestMargin(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.warnings(), m.rows());
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
             try (OutputStream out = Files.newOutputStream(file)) {
@@ -135,6 +135,6 @@ public final class Artifacts {
     /**
      * The JSON report: request, result, checks and per-district rows.
      */
-    public record Report(String state, String fips, int districts, int demRequested, boolean proportionalDefault, double minMargin, String voteData, double statewideDemShare, int demWon, int repWon, boolean hit, boolean pass, double maxDeviationPct, boolean allContiguous, boolean assignedOnce, boolean populationMatches, long population, long importedPopulation, double closestMargin, int seeds, long baseSeed, int bestChain, int chainsHit, long proposals, double flipsPerSecond, double seconds, String schedule, List<String> warnings, List<DistrictResult> districtRows) {
+    public record Report(String state, String fips, int districts, int demRequested, boolean proportionalDefault, double minMargin, String voteData, double statewideDemShare, int demWon, int repWon, boolean hit, boolean pass, double tolerancePct, double maxDeviationPct, boolean allContiguous, boolean assignedOnce, boolean populationMatches, long population, long importedPopulation, double closestMargin, int seeds, long baseSeed, int bestChain, int chainsHit, long proposals, double flipsPerSecond, double seconds, String schedule, List<String> warnings, List<DistrictResult> districtRows) {
     }
 }

@@ -44,7 +44,19 @@ class RdhTractImporterTest {
         assertEquals(16, ds.geometry().size());
         assertEquals("2024", ds.voteDataLabel());
     }
-    
+
+    @Test
+    void aVoteFileWithNoVotesInTheStateIsRefusedAndNothingIsCached() throws Exception {
+        Path zip = Fixtures.tractZip(tmp, "me_pl2020_t", Fixtures.grid("23", 2));
+        // Alabama's 2024 file saved under Maine's name: every block falls outside Maine's tracts.
+        Path votes = Fixtures.zipResource("/votes/al_2024.csv", tmp.resolve("me_2024_gen_2020_blocks_csv.zip"), "me_2024_gen_2020_blocks.csv");
+        Path cache = tmp.resolve("cache");
+        StateInfo me = States.require("ME");
+        DataException e = assertThrows(DataException.class, () -> StateImporter.importState(me, zip, votes, cache));
+        assertTrue(e.getMessage().startsWith("me_2024_gen_2020_blocks_csv.zip has no D or R presidential votes in ME's tracts"), e.getMessage());
+        assertTrue(java.nio.file.Files.notExists(TractCache.stateDir(cache, me)), "nothing cached");
+    }
+
     @Test
     void csvWithNumericGeoidsAndSeparateGeometryIsPadded() throws Exception {
         List<Fixtures.Tract> tracts = Fixtures.grid("01", 4);

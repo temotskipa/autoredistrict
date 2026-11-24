@@ -364,7 +364,7 @@ public final class App extends Application {
         resultDataset = ds;
         mapView.showPlan(Artifacts.mapData(r, ds));
         table.setItems(FXCollections.observableArrayList(r.metrics().rows()));
-        resultLabel.setText(String.format(Locale.ROOT, "%s: requested %d D · won %d D–%d R · %s · max deviation %.2f%% · closest margin %.1f pts " + "· %s · %.1f s", r.state().abbr(), r.demRequested(), r.metrics().demWon(), r.metrics().repWon(), r.hit() ? "HIT" : "miss", r.metrics().maxDeviation() * 100, r.metrics().closestMargin(), r.pass(PlanOptions.DEFAULT_TOLERANCE) ? "PASS" : "FAIL", r.seconds()));
+        resultLabel.setText(String.format(Locale.ROOT, "%s: requested %d D · won %d D–%d R · %s · max deviation %.2f%% · closest margin %.1f pts " + "· %s · %.1f s", r.state().abbr(), r.demRequested(), r.metrics().demWon(), r.metrics().repWon(), r.hit() ? "HIT" : "miss", r.metrics().maxDeviation() * 100, r.metrics().closestMargin(), r.pass() ? "PASS" : "FAIL", r.seconds()));
         seatsLabel.setText(r.metrics().demWon() + " D–" + r.metrics().repWon() + " R");
         phaseLabel.setText("done");
         setExportsDisabled(false);

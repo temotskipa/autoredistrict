@@ -98,6 +98,6 @@ public record PlanService(Path cacheRoot) {
         }
         PlanMetrics m = PlanMetrics.compute(ds, assignment, k);
         double secs = (System.nanoTime() - t0) / 1e9;
-        return new PlanResult(st, k, dem, o.demSeats() == null, o.minMargin(), ds.voteDataLabel(), share, m, assignment, seeds, o.baseSeed(), bestChain, chainsHit, proposals, secs > 0 ? proposals / secs : 0, secs, schedule, k == 1, timedOut, List.copyOf(warnings));
+        return new PlanResult(st, k, dem, o.demSeats() == null, o.minMargin(), o.tolerance(), ds.voteDataLabel(), share, m, assignment, seeds, o.baseSeed(), bestChain, chainsHit, proposals, secs > 0 ? proposals / secs : 0, secs, schedule, k == 1, timedOut, List.copyOf(warnings));
     }
 }

@@ -15,8 +15,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -45,17 +47,20 @@ public final class Main implements Runnable {
         return cl.execute(args);
     }
     
+    /**
+     * Parses "all" or a comma-separated list; a state named twice (NC,nc,37) is kept once.
+     */
     static List<StateInfo> parseStates(String spec) {
         if (spec == null || spec.equalsIgnoreCase("all")) {
             return States.all();
         }
-        List<StateInfo> out = new ArrayList<>();
+        Set<StateInfo> out = new LinkedHashSet<>();
         for (String s : spec.split(",")) {
             if (!s.isBlank()) {
-                out.add(States.require(s));
+                out.add(States.require(s.strip()));
             }
         }
-        return out;
+        return List.copyOf(out);
     }
     
     static void writeText(Path file, String text) {
@@ -90,7 +95,7 @@ public final class Main implements Runnable {
         System.out.printf(Locale.ROOT, "  votes %s (statewide D share %.4f); %d seeds, %d hit; %,d flips in %.1f s = %,.0f flips/s%n", r.voteData(), r.statewideDemShare(), r.seeds(), r.chainsHit(), r.proposals(), r.seconds(), r.flipsPerSecond());
         System.out.println("  schedule: " + r.schedule());
         r.warnings().forEach(w -> System.out.println("  warning: " + w));
-        System.out.println("  PASS: " + (r.pass(PlanOptions.DEFAULT_TOLERANCE) ? "yes" : "NO"));
+        System.out.println("  PASS: " + (r.pass() ? "yes" : "NO"));
     }
     
     @Override
@@ -204,7 +209,7 @@ public final class Main implements Runnable {
             for (Path p : Artifacts.write(r, ds, outDir, stem, true)) {
                 System.out.println("wrote " + p);
             }
-            return r.pass(PlanOptions.DEFAULT_TOLERANCE) ? 0 : 1;
+            return r.pass() ? 0 : 1;
         }
     }
     
@@ -234,10 +239,14 @@ public final class Main implements Runnable {
                     System.out.println("skipping " + s.abbr() + ": not imported");
                 }
             }
+            if (list.isEmpty()) {
+                System.err.println("No imported states to run. Import them first: autoredistrict import --rdh-dir <folder>");
+                return 1;
+            }
             BatchRunner.Summary s = BatchRunner.run(new PlanService(parent.cacheDir), list, args.options(null), args.election(), outDir, System.out::println);
             System.out.println();
             System.out.print(BatchRunner.markdown(s));
-            System.out.println("wrote " + outDir.resolve("summary.md") + ", summary.csv, contact-sheet.png");
+            System.out.println("wrote " + outDir.resolve("summary.md") + ", summary.csv" + (s.drewMaps() ? ", contact-sheet.png" : ""));
             return s.passCount() == s.rows().size() ? 0 : 1;
         }
     }
@@ -268,7 +277,7 @@ public final class Main implements Runnable {
             List<SeatRange.Row> rows = SeatRange.run(k, prop, n -> {
                 PlanResult r = svc.runUntilHit(ds, args.options(n), Progress.Listener.NONE);
                 Artifacts.write(r, ds, dir, st.key() + "-" + n + "d", false);
-                SeatRange.Row row = SeatRange.rowOf(r, PlanOptions.DEFAULT_TOLERANCE);
+                SeatRange.Row row = SeatRange.rowOf(r);
                 System.out.printf(Locale.ROOT, "%s requested %d D: won %d D–%d R, %s, max dev %.3f%%, %.1f s%n", st.abbr(), n, row.demWon(), row.repWon(), row.counts() ? "HIT" : "miss", row.maxDeviation() * 100, row.seconds());
                 return row;
             });

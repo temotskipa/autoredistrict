@@ -32,14 +32,15 @@ public final class BatchRunner {
     private BatchRunner() {
     }
     
-    public static Row row(PlanResult r, double tolerance) {
+    public static Row row(PlanResult r) {
         PlanMetrics m = r.metrics();
-        boolean pass = r.pass(tolerance) && r.seconds() < STATE_LIMIT_SECONDS;
-        String why = pass ? "PASS" : "FAIL" + reasons(r, tolerance);
+        boolean pass = r.pass() && r.seconds() < STATE_LIMIT_SECONDS;
+        String why = pass ? "PASS" : "FAIL" + reasons(r);
         return new Row(r.state().abbr(), r.state().fips(), r.districts(), r.assignment().length, m.population(), m.maxDeviation() * 100, m.allContiguous(), m.assignedOnce(), m.populationMatches(), r.demRequested(), m.demWon(), m.repWon(), r.hit(), m.closestMargin(), r.flipsPerSecond(), r.seconds(), r.voteData(), why, null);
     }
     
-    private static String reasons(PlanResult r, double tolerance) {
+    private static String reasons(PlanResult r) {
+        double tolerance = r.tolerance();
         PlanMetrics m = r.metrics();
         List<String> why = new ArrayList<>();
         if (m.districts() != r.state().seats()) {
@@ -74,7 +75,7 @@ public final class BatchRunner {
                 StateDataset ds = service.load(st, election);
                 PlanResult r = service.run(ds, options, Progress.Listener.NONE);
                 Artifacts.write(r, ds, outDir.resolve("states"), st.key(), false);
-                Row row = row(r, options.tolerance());
+                Row row = row(r);
                 rows.add(row);
                 seats += r.districts();
                 String caption = String.format(Locale.ROOT, "%s %d: %s%s", st.abbr(), r.districts(), MapRenderer.seats(r.metrics().demWon(), r.metrics().repWon()), r.hit() ? "" : " (miss)");
@@ -156,6 +157,13 @@ public final class BatchRunner {
         
         public Row slowest() {
             return rows.stream().max(Comparator.comparingDouble(Row::seconds)).orElse(null);
+        }
+        
+        /**
+         * Whether any state drew a map, so the contact sheet was written.
+         */
+        public boolean drewMaps() {
+            return rows.stream().anyMatch(r -> r.error() == null);
         }
     }
 }
