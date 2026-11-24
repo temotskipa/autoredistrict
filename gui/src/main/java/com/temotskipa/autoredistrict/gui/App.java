@@ -8,6 +8,7 @@ import com.temotskipa.autoredistrict.data.States;
 import com.temotskipa.autoredistrict.data.TractCache;
 import com.temotskipa.autoredistrict.engine.Annealer;
 import com.temotskipa.autoredistrict.engine.Progress;
+import com.temotskipa.autoredistrict.gui.Launcher.Options;
 import com.temotskipa.autoredistrict.render.Exporters;
 import com.temotskipa.autoredistrict.render.MapRenderer;
 import com.temotskipa.autoredistrict.service.*;
@@ -45,7 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public final class App extends Application {
     
-    private final Launcher.Options opts = Launcher.options;
+    private final Options opts = Launcher.options;
     private final PlanService service = new PlanService(opts.cacheDir());
     
     private final ComboBox<StateInfo> stateBox = new ComboBox<>();
@@ -74,6 +75,10 @@ public final class App extends Application {
     private StateDataset dataset;
     private PlanResult result;
     private Task<?> running;
+    /**
+     * The newest state load; completions of older ones are ignored.
+     */
+    private Task<StateDataset> loading;
     
     private static <T> TableColumn<DistrictResult, T> column(String name, java.util.function.Function<DistrictResult, T> f) {
         TableColumn<DistrictResult, T> c = new TableColumn<>(name);
@@ -193,13 +198,13 @@ public final class App extends Application {
     }
     
     private VBox resultsPane() {
-        table.getColumns().add(column("District", d -> d.district()));
+        table.getColumns().add(column("District", DistrictResult::district));
         table.getColumns().add(column("Population", d -> String.format(Locale.ROOT, "%,d", d.population())));
         table.getColumns().add(column("Deviation %", d -> String.format(Locale.ROOT, "%+.3f", d.deviation() * 100)));
         table.getColumns().add(column("D share", d -> String.format(Locale.ROOT, "%.1f%%", d.demShare() * 100)));
-        table.getColumns().add(column("Winner", d -> d.winner()));
+        table.getColumns().add(column("Winner", DistrictResult::winner));
         table.getColumns().add(column("Margin (pts)", d -> String.format(Locale.ROOT, "%+.1f", d.margin())));
-        table.getColumns().add(column("Tracts", d -> d.tracts()));
+        table.getColumns().add(column("Tracts", DistrictResult::tracts));
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(new Label("Run a plan to see its districts."));
         resultLabel.getStyleClass().add("title-4");
@@ -226,6 +231,13 @@ public final class App extends Application {
     
     private void loadState(StateInfo s) {
         Election election = Election.parse(electionBox.getValue());
+        // A newer selection replaces any load still running, and Run and Export wait for it.
+        if (loading != null) {
+            loading.cancel();
+        }
+        dataset = null;
+        result = null;
+        setExportsDisabled(true);
         Task<StateDataset> t = new Task<>() {
             @Override
             protected StateDataset call() {
@@ -235,7 +247,12 @@ public final class App extends Application {
                 return ds;
             }
         };
+        loading = t;
         t.setOnSucceeded(e -> {
+            if (t != loading) {
+                return;
+            }
+            loading = null;
             dataset = t.getValue();
             result = null;
             setExportsDisabled(true);
@@ -249,7 +266,7 @@ public final class App extends Application {
                 double r = dataset.graph().rep(i);
                 shares[i] = d + r > 0 ? d / (d + r) : 0.5;
             }
-            mapView.showState(dataset.geometry(), shares);
+            mapView.showState(dataset.geometry(), shares, Artifacts.populatedExtent(dataset));
             table.getItems().clear();
             resultLabel.setText(s.name() + ": " + dataset.size() + " tracts, " + k + " seat" + (k == 1 ? "" : "s") + ", votes " + dataset.voteDataLabel());
             statusLabel.setText(String.join("\n", dataset.warnings()));
@@ -263,7 +280,12 @@ public final class App extends Application {
                 run();
             }
         });
-        t.setOnFailed(e -> fail("Could not load " + s.abbr(), t.getException()));
+        t.setOnFailed(e -> {
+            if (t == loading) {
+                loading = null;
+                fail("Could not load " + s.abbr(), t.getException());
+            }
+        });
         Thread.ofPlatform().daemon().name("load-" + s.abbr()).start(t);
     }
     

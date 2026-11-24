@@ -104,6 +104,27 @@ class GeometryTest {
     }
     
     @Test
+    void lonLatExportCutsPolygonsAtTheAntimeridian() {
+        List<Geometry> alaska = List.of(Fixtures.box(172.5, 52.5, 173.0, 53.0), Fixtures.box(-150, 60, -149, 61));
+        AlbersProjection p = AlbersProjection.forBounds(AlbersProjection.unwrappedBounds(alaska), AlbersProjection.NAD83_ESRI);
+        // A district from 178 E to 176 W (unwrapped: -182 to -176), like the western Aleutians.
+        Geometry district = p.project(Densifier.densify(Fixtures.box(-182, 51, -176, 53), 0.05));
+        Geometry ll = p.toLonLat(district);
+        Envelope env = ll.getEnvelopeInternal();
+        assertTrue(env.getMinX() >= -180 && env.getMaxX() <= 180, "within [-180, 180]: " + env);
+        assertEquals(2, ll.getNumGeometries());
+        for (int i = 0; i < ll.getNumGeometries(); i++) {
+            Envelope part = ll.getGeometryN(i).getEnvelopeInternal();
+            assertTrue(part.getWidth() < 10, "no part spans the globe: " + part);
+        }
+        assertEquals(12.0, ll.getArea(), 1e-6, "the two parts keep the district's area in square degrees");
+        // A district that doesn't cross stays one polygon in place.
+        Geometry mainland = p.toLonLat(p.project(Fixtures.box(-150, 60, -149, 61)));
+        assertEquals(1, mainland.getNumGeometries());
+        assertEquals(-150.0, mainland.getEnvelopeInternal().getMinX(), 1e-6);
+    }
+
+    @Test
     void rookAdjacencyOnGridHasKnownSharedEdgesAndNoCorners() {
         List<Geometry> cells = new ArrayList<>();
         for (int r = 0; r < 3; r++) {

@@ -10,7 +10,14 @@ import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.CoordinateFilter;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Polygon;
+import org.locationtech.jts.geom.Polygonal;
+import org.locationtech.jts.geom.util.AffineTransformation;
+import org.locationtech.jts.geom.util.PolygonExtracter;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -142,34 +149,77 @@ public final class AlbersProjection {
      * Inverse-projects metres to lon/lat, with longitudes wrapped back into [-180, 180].
      */
     public Coordinate toLonLat(double x, double y) {
+        double[] p = inverse(x, y);
+        return new Coordinate(wrap(p[0]), p[1]);
+    }
+
+    /**
+     * Inverse-projects a geometry in metres to lon/lat. Longitudes stay continuous around the
+     * central meridian while projecting. A polygonal geometry that then crosses the antimeridian
+     * (Alaska's Aleutians) is cut there, as RFC 7946 asks of GeoJSON, so no ring spans the globe;
+     * other geometries get their longitudes wrapped into [-180, 180].
+     */
+    public Geometry toLonLat(Geometry projected) {
+        Geometry copy = projected.copy();
+        copy.apply((CoordinateFilter) c -> {
+            double[] p = inverse(c.x, c.y);
+            c.x = unwrap(p[0]);
+            c.y = p[1];
+        });
+        copy.geometryChanged();
+        Envelope env = copy.getEnvelopeInternal();
+        if (env.isNull() || (env.getMinX() >= -180 && env.getMaxX() <= 180)) {
+            return copy;
+        }
+        if (copy instanceof Polygonal) {
+            return cutAtAntimeridian(copy);
+        }
+        copy.apply((CoordinateFilter) c -> c.x = wrap(c.x));
+        copy.geometryChanged();
+        return copy;
+    }
+
+    /**
+     * Splits a polygonal lon/lat geometry with continuous longitudes into the parts east and west of
+     * the antimeridian, each shifted by 360 degrees as needed to lie within [-180, 180].
+     */
+    static Geometry cutAtAntimeridian(Geometry g) {
+        GeometryFactory f = g.getFactory();
+        List<Polygon> parts = new ArrayList<>();
+        for (int shift = -360; shift <= 360; shift += 360) {
+            // The slice that lands in [-180, 180] once moved by `shift` degrees.
+            Geometry slice = g.intersection(f.toGeometry(new Envelope(-180 - shift, 180 - shift, -90, 90)));
+            if (slice.isEmpty()) {
+                continue;
+            }
+            if (shift != 0) {
+                slice = AffineTransformation.translationInstance(shift, 0).transform(slice);
+            }
+            for (Object p : PolygonExtracter.getPolygons(slice)) {
+                parts.add((Polygon) p);
+            }
+        }
+        return f.createMultiPolygon(parts.toArray(Polygon[]::new));
+    }
+
+    private double[] inverse(double x, double y) {
         double[] p = {x, y};
         try {
             inverse.transform(p, 0, p, 0, 1);
         } catch (TransformException e) {
             throw new DataException("Could not inverse-project a point: " + e.getMessage(), e);
         }
-        double lon = p[0];
+        return p;
+    }
+
+    private static double wrap(double lon) {
         while (lon < -180) {
             lon += 360;
         }
         while (lon > 180) {
             lon -= 360;
         }
-        return new Coordinate(lon, p[1]);
-    }
-    
-    /**
-     * Inverse-projects a geometry in metres to lon/lat.
-     */
-    public Geometry toLonLat(Geometry projected) {
-        Geometry copy = projected.copy();
-        copy.apply((CoordinateFilter) c -> {
-            Coordinate ll = toLonLat(c.x, c.y);
-            c.x = ll.x;
-            c.y = ll.y;
-        });
-        copy.geometryChanged();
-        return copy;
+        return lon;
     }
     
     private double unwrap(double lon) {

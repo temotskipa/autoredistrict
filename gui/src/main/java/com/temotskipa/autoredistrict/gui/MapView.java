@@ -45,7 +45,8 @@ final class MapView extends Pane {
             dragY = e.getY();
         });
         setOnMouseDragged(e -> {
-            if (viewport != null && e.getButton() == MouseButton.PRIMARY) {
+            // getButton() names the button whose state changed, which is none during a drag.
+            if (viewport != null && e.isPrimaryButtonDown()) {
                 viewport = viewport.pan(e.getX() - dragX, e.getY() - dragY);
                 dragX = e.getX();
                 dragY = e.getY();
@@ -60,27 +61,35 @@ final class MapView extends Pane {
     }
     
     /**
-     * Shows a state's tracts, shaded by their own D share.
+     * Shows a state's tracts, shaded by their own D share, framed on {@code focus} (the populated
+     * tracts) when given, so remote empty tracts such as Hawaii's northwestern islands don't shrink it.
      */
-    void showState(List<Geometry> tracts, double[] shares) {
+    void showState(List<Geometry> tracts, double[] shares, Envelope focus) {
         this.tracts = tracts;
         this.tractShares = shares;
         this.plan = null;
         Envelope env = new Envelope();
-        for (Geometry g : tracts) {
-            env.expandToInclude(g.getEnvelopeInternal());
+        if (focus != null && !focus.isNull()) {
+            env.expandToInclude(focus);
+        }
+        else {
+            for (Geometry g : tracts) {
+                env.expandToInclude(g.getEnvelopeInternal());
+            }
         }
         this.bounds = env;
         fit();
     }
-    
+
     /**
-     * Shows a finished plan.
+     * Shows a finished plan, framed like the PNG export. Keeps the user's zoom and pan when the plan
+     * has the same frame as what is on screen.
      */
     void showPlan(MapData data) {
         this.plan = data;
-        if (bounds == null) {
-            bounds = data.bounds();
+        Envelope frame = data.bounds();
+        if (bounds == null || !bounds.equals(frame)) {
+            bounds = frame;
             fit();
         }
         else {

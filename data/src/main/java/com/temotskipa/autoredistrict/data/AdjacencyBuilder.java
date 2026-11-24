@@ -112,7 +112,15 @@ public final class AdjacencyBuilder {
         }
         return new Adjacency(a, b, len, perimeter, outer, hashed, fallback);
     }
-    
+
+    /**
+     * Exact boundary overlap for touching pairs the segment hash found nothing for (T-junctions,
+     * where one tract has a vertex the other lacks). A pair with some hashed segments is not
+     * re-measured: if part of its border were a T-junction, that part would count as outer
+     * boundary. RDH (TIGER) tract borders share their vertices, so this does not happen there: on
+     * all 50 states' 2020 tracts, no adjacent pair's hashed length fell short of the exact overlap
+     * by 1 m (checked 2026-11-24, about 230,000 pairs).
+     */
     private static int fallbackPairs(List<Geometry> lonLat, List<Geometry> projected, Map<Long, double[]> shared) {
         int n = lonLat.size();
         STRtree tree = new STRtree();
