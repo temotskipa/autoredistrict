@@ -25,11 +25,15 @@ public record PlanOptions(Integer demSeats, double minMargin, int seeds, long ba
         if (seeds < 1 || seeds > Annealer.MAX_SEEDS) {
             throw new IllegalArgumentException("--seeds must be between 1 and " + Annealer.MAX_SEEDS);
         }
-        if (minMargin < 0) {
-            throw new IllegalArgumentException("--min-margin must be >= 0");
+        // Written so NaN fails too: every comparison with NaN is false.
+        if (!(Double.isFinite(minMargin) && minMargin >= 0)) {
+            throw new IllegalArgumentException("--min-margin must be a number >= 0, not " + minMargin);
         }
-        if (scheduleScale <= 0) {
-            throw new IllegalArgumentException("--scale must be > 0");
+        if (!(Double.isFinite(scheduleScale) && scheduleScale > 0)) {
+            throw new IllegalArgumentException("--scale must be a number > 0, not " + scheduleScale);
+        }
+        if (!(tolerance > 0 && tolerance < 1)) {
+            throw new IllegalArgumentException("the population tolerance must be between 0 and 1, not " + tolerance);
         }
     }
     

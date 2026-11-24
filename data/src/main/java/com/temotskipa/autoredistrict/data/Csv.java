@@ -137,11 +137,17 @@ public final class Csv {
         if (s.isEmpty()) {
             return 0;
         }
+        double v;
         try {
-            return Double.parseDouble(s);
+            v = Double.parseDouble(s);
         } catch (NumberFormatException e) {
             throw new DataException(source + " has a non-numeric value '" + s + "' in " + column + ".");
         }
+        // parseDouble accepts NaN and Infinity, which would poison every sum they reach.
+        if (!Double.isFinite(v)) {
+            throw new DataException(source + " has a non-finite value '" + s + "' in " + column + ".");
+        }
+        return v;
     }
     
     /**

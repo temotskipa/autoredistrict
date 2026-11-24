@@ -54,6 +54,15 @@ class BlockVotesTest {
     }
     
     @Test
+    void nonFiniteVoteValuesAreAnErrorNamingFileAndColumn() {
+        for (String bad : new String[]{"NaN", "Infinity", "-Infinity"}) {
+            String csv = "GEOID20,G24PREDHAR,G24PRERTRU\n230010001001000," + bad + ",4.5\n";
+            DataException e = assertThrows(DataException.class, () -> BlockVotes.read2024(new java.io.ByteArrayInputStream(csv.getBytes(java.nio.charset.StandardCharsets.UTF_8)), "me.csv", "23", Set.of("23001000100")));
+            assertEquals("me.csv has a non-finite value '" + bad + "' in the D column.", e.getMessage());
+        }
+    }
+
+    @Test
     void fileWithoutPresidentialColumnsIsAnErrorNamingIt() {
         DataException e = assertThrows(DataException.class, () -> BlockVotes.read2024(Fixtures.resource("/votes/no_president.csv"), "xx_2024_gen_2020_blocks.csv", "23", Set.of()));
         assertTrue(e.getMessage().startsWith("xx_2024_gen_2020_blocks.csv has neither"), e.getMessage());

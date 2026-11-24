@@ -66,6 +66,18 @@ class PlanServiceTest {
     }
     
     @Test
+    void nonFiniteOptionsAreRefused() {
+        PlanOptions o = PlanOptions.defaults();
+        for (double bad : new double[]{Double.NaN, Double.POSITIVE_INFINITY}) {
+            assertThrows(IllegalArgumentException.class, () -> o.withScale(bad), "scale " + bad);
+            assertThrows(IllegalArgumentException.class, () -> o.withMargin(bad), "margin " + bad);
+            assertThrows(IllegalArgumentException.class, () -> new PlanOptions(null, 2.0, 2, 1, 1.0, PlanOptions.DEFAULT_BUDGET, bad), "tolerance " + bad);
+        }
+        assertThrows(IllegalArgumentException.class, () -> o.withScale(-1));
+        assertEquals(3.0, o.withScale(3.0).scheduleScale());
+    }
+
+    @Test
     void proportionalDefaultIsRoundedAndClamped() {
         assertEquals(7, PlanOptions.proportional(0.4837, 14)); // NC 2024: 6.77
         assertEquals(16, PlanOptions.proportional(0.4306, 38)); // TX 2024: 16.36
