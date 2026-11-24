@@ -106,7 +106,7 @@ public final class Main implements Runnable {
         @Option(names = "--min-margin", defaultValue = "2.0", description = "Two-party margin in points each targeted district should clear (default 2.0).")
         double minMargin;
         
-        @Option(names = "--seeds", description = "Chains per request, run in parallel (default: cores, max 16).")
+        @Option(names = "--seeds", description = "Chains per request, run in parallel, 1 to 256 (default: cores, max 16).")
         Integer seeds;
         
         @Option(names = "--seed", defaultValue = "1", description = "Seed of the first chain (default 1).")

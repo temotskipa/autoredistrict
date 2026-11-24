@@ -74,6 +74,10 @@ public final class App extends Application {
     private Stage stage;
     private StateDataset dataset;
     private PlanResult result;
+    /**
+     * The dataset {@link #result} was drawn from; exports use it, not whatever is selected now.
+     */
+    private StateDataset resultDataset;
     private Task<?> running;
     /**
      * The newest state load; completions of older ones are ignored.
@@ -237,6 +241,7 @@ public final class App extends Application {
         }
         dataset = null;
         result = null;
+        resultDataset = null;
         setExportsDisabled(true);
         Task<StateDataset> t = new Task<>() {
             @Override
@@ -322,7 +327,13 @@ public final class App extends Application {
         t.setOnSucceeded(e -> {
             running = null;
             setRunning(false);
-            showResult(t.getValue());
+            // The selectors are locked during a run, but if the selection changed anyway the
+            // result belongs to another dataset than the one on screen: drop it.
+            if (ds != dataset) {
+                phaseLabel.setText("done (selection changed; result discarded)");
+                return;
+            }
+            showResult(t.getValue(), ds);
             progressBar.setProgress(1);
             if (opts.snapshotState() != null) {
                 // Let the table and map lay out, then capture the whole window.
@@ -348,9 +359,10 @@ public final class App extends Application {
         Thread.ofPlatform().daemon().name("plan-run").start(t);
     }
     
-    private void showResult(PlanResult r) {
+    private void showResult(PlanResult r, StateDataset ds) {
         result = r;
-        mapView.showPlan(Artifacts.mapData(r, dataset));
+        resultDataset = ds;
+        mapView.showPlan(Artifacts.mapData(r, ds));
         table.setItems(FXCollections.observableArrayList(r.metrics().rows()));
         resultLabel.setText(String.format(Locale.ROOT, "%s: requested %d D · won %d D–%d R · %s · max deviation %.2f%% · closest margin %.1f pts " + "· %s · %.1f s", r.state().abbr(), r.demRequested(), r.metrics().demWon(), r.metrics().repWon(), r.hit() ? "HIT" : "miss", r.metrics().maxDeviation() * 100, r.metrics().closestMargin(), r.pass(PlanOptions.DEFAULT_TOLERANCE) ? "PASS" : "FAIL", r.seconds()));
         seatsLabel.setText(r.metrics().demWon() + " D–" + r.metrics().repWon() + " R");
@@ -361,7 +373,9 @@ public final class App extends Application {
     private void setRunning(boolean on) {
         runButton.setDisable(on);
         cancelButton.setDisable(!on);
+        // Changing the state or the election reloads the dataset, so both wait for the run.
         stateBox.setDisable(on);
+        electionBox.setDisable(on);
         importButton.setDisable(on);
     }
     
@@ -386,8 +400,8 @@ public final class App extends Application {
             switch (kind) {
                 case "png" -> MapRenderer.writePng(Artifacts.png(mapView.plan(), 1600), f.toPath());
                 case "geojson" ->
-                        Exporters.geoJson(f.toPath(), mapView.plan().districtShapes(), Artifacts.props(result), g -> dataset.projection().toLonLat(g));
-                default -> Exporters.assignmentCsv(f.toPath(), dataset.geoids(), result.assignment());
+                        Exporters.geoJson(f.toPath(), mapView.plan().districtShapes(), Artifacts.props(result), g -> resultDataset.projection().toLonLat(g));
+                default -> Exporters.assignmentCsv(f.toPath(), resultDataset.geoids(), result.assignment());
             }
             statusLabel.setText("Saved " + f);
         } catch (RuntimeException ex) {

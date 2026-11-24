@@ -21,6 +21,12 @@ import java.util.function.Predicate;
  */
 public final class Annealer {
     
+    /**
+     * Most chains one request may run. Each chain is a platform thread from the start (it then waits
+     * for a free core), so the count is capped rather than left to exhaust native threads.
+     */
+    public static final int MAX_SEEDS = 256;
+    
     private Annealer() {
     }
     
@@ -46,6 +52,7 @@ public final class Annealer {
      * Runs every chain to the end; results are in seed order.
      */
     public static List<ChainResult> runAll(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener) throws InterruptedException {
+        checkSeedCount(seeds);
         Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()));
         try (var scope = StructuredTaskScope.open(Joiner.<ChainResult>allSuccessfulOrThrow(), cfg -> cfg.withName("anneal").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
             for (int i = 0; i < seeds.length; i++) {
@@ -65,6 +72,7 @@ public final class Annealer {
      * rest (structured concurrency's {@code Joiner.allUntil}).
      */
     public static Until runUntil(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener, Predicate<ChainResult> stop) throws InterruptedException {
+        checkSeedCount(seeds);
         Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()));
         // Subtasks that end after the scope is cancelled report nothing, so every chain adds its own
         // proposals here, finished or cancelled. The scope's close waits for all of them.
@@ -102,6 +110,12 @@ public final class Annealer {
         }
         results.sort(Comparator.comparingInt(ChainResult::chain));
         return new Until(results, proposals.sum());
+    }
+    
+    private static void checkSeedCount(long[] seeds) {
+        if (seeds.length < 1 || seeds.length > MAX_SEEDS) {
+            throw new IllegalArgumentException("between 1 and " + MAX_SEEDS + " chains per request, not " + seeds.length);
+        }
     }
     
     private static ChainResult runLimited(Semaphore cores, Graph g, Target target, Schedule schedule, InitialMap initial, long seed, int index, Progress.Listener listener) throws InterruptedException {

@@ -2,11 +2,23 @@ plugins {
 	id("autoredistrict.application-conventions")
 }
 
+// JavaFX ships its native libraries per platform; build for the host (win, mac, mac-aarch64, linux,
+// linux-aarch64). Set -Pjavafx.platform=<classifier> to build for another one.
+val javafxPlatform: String = providers.gradleProperty("javafx.platform").orNull ?: run {
+	val os = System.getProperty("os.name").lowercase()
+	val arm = System.getProperty("os.arch").lowercase() in setOf("aarch64", "arm64")
+	when {
+		os.startsWith("windows") -> "win"
+		os.startsWith("mac") -> if (arm) "mac-aarch64" else "mac"
+		else -> if (arm) "linux-aarch64" else "linux"
+	}
+}
+
 dependencies {
 	implementation(project(":service"))
-	implementation(variantOf(libs.javafx.base) { classifier("win") })
-	implementation(variantOf(libs.javafx.graphics) { classifier("win") })
-	implementation(variantOf(libs.javafx.controls) { classifier("win") })
+	implementation(variantOf(libs.javafx.base) { classifier(javafxPlatform) })
+	implementation(variantOf(libs.javafx.graphics) { classifier(javafxPlatform) })
+	implementation(variantOf(libs.javafx.controls) { classifier(javafxPlatform) })
 	implementation(libs.atlantafx)
 }
 

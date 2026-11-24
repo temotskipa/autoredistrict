@@ -22,8 +22,8 @@ public record PlanOptions(Integer demSeats, double minMargin, int seeds, long ba
     public static final Duration DEFAULT_BUDGET = Duration.ofMinutes(12);
     
     public PlanOptions {
-        if (seeds < 1) {
-            throw new IllegalArgumentException("--seeds must be at least 1");
+        if (seeds < 1 || seeds > Annealer.MAX_SEEDS) {
+            throw new IllegalArgumentException("--seeds must be between 1 and " + Annealer.MAX_SEEDS);
         }
         if (minMargin < 0) {
             throw new IllegalArgumentException("--min-margin must be >= 0");

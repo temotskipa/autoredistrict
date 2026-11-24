@@ -82,6 +82,16 @@ class AnnealerTest {
     }
     
     @Test
+    void tooManySeedsAreRefusedBeforeAnyChainThreadStarts() {
+        Graph g = planted();
+        Target t = new Target(4, 2, 2.0, 0.02);
+        long[] seeds = Annealer.seeds(1, Annealer.MAX_SEEDS + 1);
+        assertThrows(IllegalArgumentException.class, () -> Annealer.runAll(g, t, Grids.schedule(1_000), Grids.BFS_VORONOI, seeds, Progress.Listener.NONE));
+        assertThrows(IllegalArgumentException.class, () -> Annealer.runUntil(g, t, Grids.schedule(1_000), Grids.BFS_VORONOI, seeds, Progress.Listener.NONE, r -> true));
+        assertEquals(0, chainThreads());
+    }
+
+    @Test
     void runUntilStopsTheOtherChainsAfterAMatch() throws InterruptedException {
         Graph g = planted();
         Annealer.Until u = Annealer.runUntil(g, new Target(4, 2, 2.0, 0.02), Grids.schedule(10_000), Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, r -> true);
