@@ -104,4 +104,45 @@ class DistrictingTest {
         assertTrue(r.maxDeviation() <= 0.025);
         assertEquals(3, r.phases().size());
     }
+
+    @Test
+    void pruningMoveTakesAOneTractWideTailAlong() {
+        // District 0: the left half plus a tail along the top row to the right edge (like El Paso's
+        // tail into Reeves County). Flipping the tail's first cell alone would cut the rest off.
+        Graph g = Grids.lattice(10, 10, 10, i -> 0.5);
+        int[] init = new int[100];
+        for (int i = 0; i < 100; i++) {
+            int r = i / 10;
+            int c = i % 10;
+            init[i] = c < 5 || r == 9 ? 0 : 1;
+        }
+        Districting d = new Districting(g, 2, init, 10);
+        d.setWeights(new Weights(1, 0, 0, 0));
+        int neck = 9 * 10 + 5; // top row, first tail cell
+        assertTrue(!Double.isNaN(d.evaluate(neck, 1)));
+        assertTrue(!d.removalKeepsConnected(neck), "the neck is a cut vertex");
+        assertTrue(d.tryPieceMove(neck, 1, 1e9, new SplittableRandom(1)), "neck and tail move together");
+        int[] a = d.assignment();
+        for (int c = 5; c < 10; c++) {
+            assertEquals(1, a[90 + c], "tail cell " + c);
+        }
+        d.verifyTallies();
+        assertEquals(50, d.populationOf(0) / 10);
+        // A piece move that makes population worse is rejected at a cold temperature and undone exactly:
+        // district 0 has 46 cells, and moving its 6-cell tail away would leave 40 against 60.
+        int[] small = new int[100];
+        for (int i = 0; i < 100; i++) {
+            small[i] = i % 10 < 4 || i / 10 == 9 ? 0 : 1;
+        }
+        Districting e = new Districting(g, 2, small, 10);
+        e.setWeights(new Weights(1, 0, 0, 0));
+        int neck2 = 9 * 10 + 4;
+        e.evaluate(neck2, 1);
+        assertTrue(!e.removalKeepsConnected(neck2));
+        double before = e.score();
+        assertTrue(!e.tryPieceMove(neck2, 1, 1e-30, new SplittableRandom(1)), "worse move rejected");
+        assertEquals(java.util.Arrays.toString(small), java.util.Arrays.toString(e.assignment()));
+        assertEquals(before, e.score(), 1e-9 * Math.max(1, Math.abs(before)));
+        e.verifyTallies();
+    }
 }
