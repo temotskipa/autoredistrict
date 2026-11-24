@@ -2,45 +2,47 @@
 
 ## Project overview
 
-Autoredistrict is a local-first congressional redistricting workbench written in Python. It has two front ends, a
-FastAPI web app with a browser UI and a headless CLI. Both run the same pipeline in
-`src/services/redistricting_service.py`. Geographic data is handled with GeoPandas and Shapely.
+Autoredistrict draws tract-level congressional maps that deliver a requested number of Democratic seats, for all 50
+states. It is a Java 28 application (preview features on) with a JavaFX GUI and a picocli CLI. Both call the same
+service layer. The method is a Monte Carlo simulated anneal after AlphaPhoenix's video "Algorithmic Redistricting:
+Elections made-to-order"; README.md describes it.
 
-## Key modules
+## Modules
 
-- `src/api.py`: FastAPI routes; serves the UI from `src/web/` and plan artifacts from `.cache/web/plans/`.
-- `src/webapp.py`: uvicorn entry point (`python -m src.webapp`).
-- `src/cli.py`: CLI entry point (`python -m src.cli`), including `demo`, `smoke`, and `live` modes.
-- `src/services/redistricting_service.py`: demo dataset, Census/TIGER merge, solve, metrics, warnings, artifact writing.
-  New features belong here, not in a front end.
-- `src/core/graph_solver.py`: `GraphRedistrictingSolver`, the current solver.
-- `src/core/utils.py`: adjacency, contiguity, Polsby-Popper, and population-weighted partisan share.
-- `src/core/apportionment.py`: Huntington-Hill apportionment.
-- `src/data/census_fetcher.py`: `DataFetcherWorker`, which downloads Census P1 data and TIGER shapefiles with retries
-  and caching under `.cache/`. It creates the Census client only when a download needs it, so cached states run without
-  an API key.
-- `src/data/rdh_import.py`: imports Redistricting Data Hub PL 94-171 downloads into that same cache, for places where
-  census.gov is blocked (`python -m src.cli --import-rdh <zip>`).
-- `src/data/partisan_providers.py`, `src/data/partisan_data.py`: election-return providers, registered from
-  `data/provider_sources.yaml`.
-- `src/rendering/map_generator.py`: map PNG and shapefile export.
+- `engine`: pure Java, no I/O and no GeoTools. `Graph` (CSR adjacency), `Districting` (chain state, incremental
+  tallies, contiguity, scoring, the pruning move), `SingleFlip` behind `MoveKernel`, `SeatBands`, `Chain` (phases,
+  temperatures, repair), `Annealer` (parallel seeds with `StructuredTaskScope` on platform threads).
+- `data`: `RdhTractImporter` (GeoTools shapefile/CSV reading, GEOID padding, validation), `AlbersProjection`,
+  `AdjacencyBuilder`, `Connectivity`, `BlockVotes`, `TractCache` (`.cache/rdh/<st>/`), `StateDataset`, `StateImporter`,
+  `States` (2020 apportionment).
+- `service`: `PlanService` (run, at-large short cut), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS checks),
+  `SeatRange`, `BatchRunner`, `Artifacts`, `ImportService`. New features belong here, not in a front end.
+- `render`: `MapPainter` over `Canvas2D` (Java2D here, JavaFX in the GUI), `MapRenderer`, `Exporters`.
+- `cli`: `autoredistrict.cli.Main` with `import`, `run`, `all`, `seat-range`.
+- `gui`: `autoredistrict.gui.Launcher` and `App`, including snapshot mode.
 
 ## Development guidelines
 
-- Use uv: `uv sync`, then `uv run pytest`. Tests live in `tests/` and must pass before a change is done.
-- Follow PEP 8.
-- Keep front ends thin. Logic shared by the web app and the CLI goes in the service layer.
-- Handle network and file errors explicitly. Census and TIGER downloads fail intermittently.
+- Build with the Gradle wrapper: `.\gradlew.bat test` must pass before a change is done. Tests live in each module's
+  `src/test/java`; fixtures are small synthetic files in `src/test/resources` or built by the tests.
+- The toolchain is JDK 28 EA in `~/.jdks`. `--enable-preview` and the launch flags live in `buildSrc` (`JvmFlags`,
+  the `autoredistrict.java-conventions` and `autoredistrict.application-conventions` plugins); don't add them per module.
+- Java conventions: standard Java naming, 4-space indents, no wildcard imports in new code, `value record` for small
+  immutable types, records for data carriers, primitive arrays in the engine's hot loop (no allocation per step).
+- Keep front ends thin. Logic shared by the GUI and the CLI goes in `service`.
+- Handle file and parsing errors explicitly with messages that say what to do (`DataException`).
+- Don't commit generated data: `.cache/`, `out/`, `build/` and `*.aot` are ignored.
+- Runs must stay deterministic for a given seed (no time-dependent behaviour except the time budget).
+
+## Data
+
+- All geography and votes come from Redistricting Data Hub downloads imported with `autoredistrict import`. Runs read
+  only the cache. Population comes from the PL tract files only.
+- census.gov (the API, `www2` TIGER downloads and the website) returns Cloudflare 403 pages from some regions,
+  including the user's. Don't assume live fetches work; nothing in the app contacts census.gov.
 
 ## Known limitations
 
-- The graph solver does not scale. It rebuilds GeoDataFrames and runs polygon unions for every scored move, so runtime
-  grows quickly with unit count. Replacing it is the top priority.
-- Partisan scores are county-level and applied uniformly to every tract or block in a county.
-
-## API usage notes
-
-- Census API block-level requests must specify both state and county FIPS codes. A request for all blocks in a state
-  without a county fails.
-- census.gov (the API, `www2` TIGER downloads and the website) returns Cloudflare 403 pages from some regions, including
-  the user's. Don't assume live fetches work; prefer cached or imported data in tests and checks.
+- Votes are one presidential race, split from precincts to blocks by RDH; seat results are estimates.
+- Some seat requests are geographically impossible; they are reported as misses.
+- California has no 2024 block file at RDH and falls back to 2020.
