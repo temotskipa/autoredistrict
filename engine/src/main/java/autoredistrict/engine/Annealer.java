@@ -10,6 +10,7 @@ import java.util.concurrent.StructuredTaskScope;
 import java.util.concurrent.StructuredTaskScope.Joiner;
 import java.util.concurrent.StructuredTaskScope.Subtask;
 import java.util.concurrent.StructuredTaskScope.Subtask.State;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Predicate;
 
 /**
@@ -61,15 +62,27 @@ public final class Annealer {
     
     /**
      * Runs the chains until one finishes with a result {@code stop} accepts, then cancels the
-     * rest (structured concurrency's {@code Joiner.allUntil}). Returns the chains that finished.
+     * rest (structured concurrency's {@code Joiner.allUntil}).
      */
-    public static List<ChainResult> runUntil(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener, Predicate<ChainResult> stop) throws InterruptedException {
+    public static Until runUntil(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener, Predicate<ChainResult> stop) throws InterruptedException {
         Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()));
+        // Subtasks that end after the scope is cancelled report nothing, so every chain adds its own
+        // proposals here, finished or cancelled. The scope's close waits for all of them.
+        LongAdder proposals = new LongAdder();
         List<Subtask<ChainResult>> done;
         try (var scope = StructuredTaskScope.open(Joiner.<ChainResult>allUntil(t -> t.state() == State.SUCCESS && stop.test(t.get())), cfg -> cfg.withName("anneal-until").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
             for (int i = 0; i < seeds.length; i++) {
                 int index = i;
-                scope.fork(() -> runLimited(cores, g, target, schedule, initial, seeds[index], index, listener));
+                scope.fork(() -> {
+                    try {
+                        ChainResult r = runLimited(cores, g, target, schedule, initial, seeds[index], index, listener);
+                        proposals.add(r.proposals());
+                        return r;
+                    } catch (Chain.Cancelled c) {
+                        proposals.add(c.proposals());
+                        throw c;
+                    }
+                });
             }
             done = scope.join();
         }
@@ -88,9 +101,18 @@ public final class Annealer {
             }
         }
         results.sort(Comparator.comparingInt(ChainResult::chain));
-        return results;
+        return new Until(results, proposals.sum());
     }
-    
+
+    /**
+     * What {@link #runUntil} returns.
+     *
+     * @param finished  the chains whose results are available, in seed order
+     * @param proposals proposals made by every chain, including the cancelled ones
+     */
+    public record Until(List<ChainResult> finished, long proposals) {
+    }
+
     private static ChainResult runLimited(Semaphore cores, Graph g, Target target, Schedule schedule, InitialMap initial, long seed, int index, Progress.Listener listener) throws InterruptedException {
         cores.acquire();
         try {

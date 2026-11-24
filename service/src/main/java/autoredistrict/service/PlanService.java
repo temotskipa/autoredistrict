@@ -66,13 +66,24 @@ public record PlanService(Path cacheRoot) {
             schedule = Schedules.describe(s);
             Target target = new Target(k, dem, o.minMargin(), o.tolerance());
             long[] seedList = Annealer.seeds(o.baseSeed(), o.seeds());
-            List<ChainResult> rs = untilHit ? Annealer.runUntil(g, target, s, GraphVoronoi.INSTANCE, seedList, listener, r -> r.hit() && r.populationValid()) : Annealer.runAll(g, target, s, GraphVoronoi.INSTANCE, seedList, listener);
+            List<ChainResult> rs;
+            if (untilHit) {
+                // Cancelled chains count toward flips per second too.
+                Annealer.Until until = Annealer.runUntil(g, target, s, GraphVoronoi.INSTANCE, seedList, listener, r -> r.hit() && r.populationValid());
+                rs = until.finished();
+                proposals = until.proposals();
+            }
+            else {
+                rs = Annealer.runAll(g, target, s, GraphVoronoi.INSTANCE, seedList, listener);
+                for (ChainResult r : rs) {
+                    proposals += r.proposals();
+                }
+            }
             ChainResult best = Annealer.best(rs);
             assignment = best.assignment();
             seeds = o.seeds();
             bestChain = best.chain();
             for (ChainResult r : rs) {
-                proposals += r.proposals();
                 if (r.hit()) {
                     chainsHit++;
                 }

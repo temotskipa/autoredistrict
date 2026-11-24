@@ -84,8 +84,11 @@ class AnnealerTest {
     @Test
     void runUntilStopsTheOtherChainsAfterAMatch() throws InterruptedException {
         Graph g = planted();
-        List<ChainResult> rs = Annealer.runUntil(g, new Target(4, 2, 2.0, 0.02), Grids.schedule(10_000), Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, r -> true);
+        Annealer.Until u = Annealer.runUntil(g, new Target(4, 2, 2.0, 0.02), Grids.schedule(10_000), Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, r -> true);
+        List<ChainResult> rs = u.finished();
         assertTrue(!rs.isEmpty() && rs.size() <= 3);
+        long finished = rs.stream().mapToLong(ChainResult::proposals).sum();
+        assertTrue(u.proposals() >= finished, "every chain's proposals are counted: " + u.proposals() + " < " + finished);
         assertEquals(0, chainThreads());
     }
 }

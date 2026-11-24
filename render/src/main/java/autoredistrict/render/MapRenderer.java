@@ -33,7 +33,10 @@ public final class MapRenderer {
             Envelope env = data.bounds();
             MapPainter.Viewport vp = MapPainter.Viewport.fit(env, 0, header, width, height - header, 24);
             double label = Math.clamp(260.0 / Math.sqrt(Math.max(1, data.districts())), 11, 18);
+            // Keep the map (water tracts can reach past the populated frame) out of the header band.
+            g.setClip(0, (int) header, width, height - (int) header);
             MapPainter.paint(c, data, vp, true, label);
+            g.setClip(null);
             MapPainter.header(c, data, width, 16);
         } finally {
             g.dispose();

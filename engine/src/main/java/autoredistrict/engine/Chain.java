@@ -62,7 +62,7 @@ public final class Chain {
                 temp *= factor;
                 if ((s & 0xFFF) == 0) {
                     if (Thread.currentThread().isInterrupted()) {
-                        throw new CancellationException("chain " + chainIndex + " cancelled");
+                        throw new Cancelled(chainIndex, stats.proposals);
                     }
                     if (repair && d.allInside()) {
                         break;
@@ -112,5 +112,23 @@ public final class Chain {
         }
         Arrays.sort(ups, 0, m);
         return ups[m / 2] / Math.log(1 / ph.startAcceptance());
+    }
+
+    /**
+     * Thrown when the chain's thread is interrupted. Carries the proposals made so far, so a
+     * cancelled chain still counts toward flips per second.
+     */
+    public static final class Cancelled extends CancellationException {
+
+        private final long proposals;
+
+        Cancelled(int chain, long proposals) {
+            super("chain " + chain + " cancelled");
+            this.proposals = proposals;
+        }
+
+        public long proposals() {
+            return proposals;
+        }
     }
 }

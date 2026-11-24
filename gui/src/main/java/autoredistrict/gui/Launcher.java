@@ -52,6 +52,6 @@ public final class Launcher {
     /**
      * Parsed command-line options.
      */
-    record Options(Path cacheDir, String snapshotState, Integer demSeats, Path out, Integer seeds, boolean exitAfterShow) {
+    value record Options(Path cacheDir, String snapshotState, Integer demSeats, Path out, Integer seeds, boolean exitAfterShow) {
     }
 }
