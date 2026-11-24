@@ -1,19 +1,17 @@
-# Python
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
+# Gradle and build output
+.gradle/
+build/
+buildSrc/.kotlin/
+.kotlin/
+
+# Imported data, plan artifacts and maps (never committed)
+.cache/
+out/
+*.png
+*.zip
+*.aot
 
 # IDE files
 .idea/
 .vscode/
-
-# Temporary files
-*.png
-*.zip
-shapefiles_*/
-config.json
-.cache
+*.iml

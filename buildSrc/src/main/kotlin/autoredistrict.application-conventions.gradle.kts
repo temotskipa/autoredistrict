@@ -1,0 +1,37 @@
+plugins {
+    id("autoredistrict.java-conventions")
+    application
+}
+
+application {
+    applicationDefaultJvmArgs = JvmFlags.launch
+}
+
+// The start scripts run on the JDK 28 EA toolchain, not whatever JAVA_HOME points at
+// (here Temurin 25, which can't load preview class files). AUTOREDISTRICT_JAVA_HOME overrides it.
+val toolchainHome = javaToolchains.launcherFor(java.toolchain).map {
+    it.metadata.installationPath.asFile.absolutePath
+}
+
+tasks.named<CreateStartScripts>("startScripts") {
+    inputs.property("toolchainHome", toolchainHome)
+    doLast {
+        val home = toolchainHome.get()
+        val bat = windowsScript.readText()
+        windowsScript.writeText(
+            bat.replace(
+                "@rem Find java.exe",
+                "if defined AUTOREDISTRICT_JAVA_HOME (set \"JAVA_HOME=%AUTOREDISTRICT_JAVA_HOME%\") " +
+                    "else (set \"JAVA_HOME=$home\")\r\n\r\n@rem Find java.exe",
+            ).replace("__APP_HOME__", "%APP_HOME%")
+        )
+        val unixHome = home.replace('\\', '/')
+        val sh = unixScript.readText()
+        unixScript.writeText(
+            sh.replaceFirst(
+                "# Determine the Java command to use",
+                "JAVA_HOME=\"\${AUTOREDISTRICT_JAVA_HOME:-$unixHome}\"\n\n# Determine the Java command to use",
+            ).replace("__APP_HOME__", "'\"\$APP_HOME\"'")
+        )
+    }
+}
