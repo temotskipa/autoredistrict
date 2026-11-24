@@ -218,6 +218,12 @@ public final class StateImporter {
                     }
                     results.set(i, new ImportSummary(r.state(), r.tracts(), r.population(), r.edges(), r.bridges(), r.componentsBefore(), r.fallbackPairs(), "2020 (fallback)", v.dem(), v.rep(), v.tractsMissing(), v.blocksOutside(), r.seconds(), w, null));
                 }
+                else if (r.ok() && v != null && v.warning() != null) {
+                    // 2020 file problems (TOT_POP mismatches) are warnings for every state.
+                    List<String> w = new ArrayList<>(r.warnings());
+                    w.add("2020 votes: " + v.warning());
+                    results.set(i, new ImportSummary(r.state(), r.tracts(), r.population(), r.edges(), r.bridges(), r.componentsBefore(), r.fallbackPairs(), r.defaultElection(), r.dem(), r.rep(), r.tractsWithoutVotes(), r.blocksOutside(), r.seconds(), w, null));
+                }
             }
         }
         return results;

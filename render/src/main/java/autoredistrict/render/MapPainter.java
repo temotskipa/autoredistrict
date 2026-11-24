@@ -14,9 +14,18 @@ public final class MapPainter {
     public static final int BACKGROUND = 0xFFF7F7F5;
     public static final int OUTLINE = 0xFF262626;
     public static final int TEXT = 0xFF1A1A1A;
+    
     private MapPainter() {
     }
     
+    /** Mixes {@code t} of colour b into colour a. */
+    static int blend(int a, int b, double t) {
+        int r = (int) Math.round(((a >> 16) & 0xFF) * (1 - t) + ((b >> 16) & 0xFF) * t);
+        int g = (int) Math.round(((a >> 8) & 0xFF) * (1 - t) + ((b >> 8) & 0xFF) * t);
+        int bl = (int) Math.round((a & 0xFF) * (1 - t) + (b & 0xFF) * t);
+        return 0xFF000000 | (r << 16) | (g << 8) | bl;
+    }
+
     /**
      * D share to colour: red below 50%, blue above, saturating 20 points from even.
      */
@@ -48,6 +57,9 @@ public final class MapPainter {
         for (int i = 0; i < data.assignment().length; i++) {
             Geometry g = data.tracts().get(i);
             int col = color[data.assignment()[i]];
+            if (data.isEmpty(i)) {
+                col = blend(col, BACKGROUND, 0.65);
+            }
             path(c, g, vp);
             c.fill(col);
             c.stroke(col, 0.6);

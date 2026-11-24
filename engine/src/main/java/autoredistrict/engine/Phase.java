@@ -9,6 +9,5 @@ package autoredistrict.engine;
  * leave it. Early phases leave it off so surplus population can spread through the districts
  * (with it on, a district far over ideal jams against full neighbours).
  */
-public value record Phase(String name, long steps, Weights weights, double startAcceptance, double coolTo,
-                          double selectionBias, boolean hardBound) {
+public value record Phase(String name, long steps, Weights weights, double startAcceptance, double coolTo, double selectionBias, boolean hardBound) {
 }

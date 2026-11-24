@@ -1,28 +1,66 @@
 package autoredistrict.data;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-
 import org.junit.jupiter.api.Test;
 import org.locationtech.jts.densify.Densifier;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
 
-/** Projection, adjacency and connectivity on small fixtures with known answers. */
-class GeometryTest {
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * Projection, adjacency and connectivity on small fixtures with known answers.
+ */
+class GeometryTest {
+    
     // GRS 1980, as in NAD83.
     private static final double A = 6378137.0;
     private static final double F = 1 / 298.257222101;
     private static final double E2 = 2 * F - F * F;
     private static final double E = Math.sqrt(E2);
-
+    
+    private static Map<Long, Double> edges(AdjacencyBuilder.Adjacency adj) {
+        Map<Long, Double> out = new HashMap<>();
+        for (int e = 0; e < adj.edgeCount(); e++) {
+            out.put(AdjacencyBuilder.pairKey(adj.a()[e], adj.b()[e]), adj.length()[e]);
+        }
+        return out;
+    }
+    
+    private static double q(double phi) {
+        double s = Math.sin(phi);
+        return (1 - E2) * (s / (1 - E2 * s * s) - (1 / (2 * E)) * Math.log((1 - E * s) / (1 + E * s)));
+    }
+    
+    private static double m(double phi) {
+        double s = Math.sin(phi);
+        return Math.cos(phi) / Math.sqrt(1 - E2 * s * s);
+    }
+    
+    /**
+     * Snyder (1987), eqs. 14-1 to 14-6: ellipsoidal Albers equal-area conic.
+     */
+    private static double[] snyder(double lon, double lat, double lat1, double lat2, double lat0, double lon0) {
+        double p1 = Math.toRadians(lat1);
+        double p2 = Math.toRadians(lat2);
+        double m1 = m(p1);
+        double m2 = m(p2);
+        double q1 = q(p1);
+        double q2 = q(p2);
+        double n = (m1 * m1 - m2 * m2) / (q2 - q1);
+        double c = m1 * m1 + n * q1;
+        double rho0 = A * Math.sqrt(c - n * q(Math.toRadians(lat0))) / n;
+        double rho = A * Math.sqrt(c - n * q(Math.toRadians(lat))) / n;
+        double theta = n * Math.toRadians(lon - lon0);
+        return new double[]{rho * Math.sin(theta), rho0 - rho * Math.cos(theta)};
+    }
+    
     @Test
     void albersMatchesSnyderFormulasAtKnownPoints() {
         AlbersProjection p = AlbersProjection.of(43.5, 46.5, 45.0, -69.0, AlbersProjection.NAD83_ESRI);
@@ -40,7 +78,7 @@ class GeometryTest {
             assertEquals(ll[1], back.y, 1e-9);
         }
     }
-
+    
     @Test
     void albersIsEqualArea() {
         AlbersProjection p = AlbersProjection.of(43.5, 46.5, 45.0, -69.0, AlbersProjection.NAD83_ESRI);
@@ -49,11 +87,10 @@ class GeometryTest {
         double exact = A * A / 2 * Math.toRadians(1.0) * Math.abs(q(Math.toRadians(45)) - q(Math.toRadians(44)));
         assertEquals(exact, projected, exact * 1e-6);
     }
-
+    
     @Test
     void aleutiansLandWestOfTheRestOfAlaska() {
-        List<Geometry> geoms = List.of(Fixtures.box(172.5, 52.5, 173.0, 53.0), Fixtures.box(-150, 60, -149, 61),
-                Fixtures.box(-179.5, 51.0, -179.0, 51.5));
+        List<Geometry> geoms = List.of(Fixtures.box(172.5, 52.5, 173.0, 53.0), Fixtures.box(-150, 60, -149, 61), Fixtures.box(-179.5, 51.0, -179.0, 51.5));
         Envelope env = AlbersProjection.unwrappedBounds(geoms);
         assertEquals(-187.5, env.getMinX(), 1e-9);
         assertEquals(-149.0, env.getMaxX(), 1e-9);
@@ -65,7 +102,7 @@ class GeometryTest {
         // Attu is about 8 degrees west of Adak: several hundred km, not across the globe.
         assertTrue(adak - attu > 400_000 && adak - attu < 700_000, "gap " + (adak - attu));
     }
-
+    
     @Test
     void rookAdjacencyOnGridHasKnownSharedEdgesAndNoCorners() {
         List<Geometry> cells = new ArrayList<>();
@@ -85,7 +122,7 @@ class GeometryTest {
         assertEquals(20.0, adj.outer()[0], 1e-9);
         assertEquals(0, adj.fallbackPairs());
     }
-
+    
     @Test
     void fallbackFindsTJunctionsTheHashMisses() {
         // A's top edge is one segment; B and C split it at x=10, a vertex A doesn't have.
@@ -100,11 +137,10 @@ class GeometryTest {
         assertEquals(10.0, lengths.get(AdjacencyBuilder.pairKey(0, 2)), 1e-9);
         assertEquals(10.0, lengths.get(AdjacencyBuilder.pairKey(1, 2)), 1e-9);
     }
-
+    
     @Test
     void islandsAreLinkedToTheirNearestNeighbour() {
-        List<Geometry> geoms = List.of(Fixtures.box(0, 0, 10, 10), Fixtures.box(10, 0, 20, 10),
-                Fixtures.box(50, 0, 60, 10), Fixtures.box(26, 30, 30, 34), Fixtures.box(80, 80, 90, 90));
+        List<Geometry> geoms = List.of(Fixtures.box(0, 0, 10, 10), Fixtures.box(10, 0, 20, 10), Fixtures.box(50, 0, 60, 10), Fixtures.box(26, 30, 30, 34), Fixtures.box(80, 80, 90, 90));
         AdjacencyBuilder.Adjacency adj = AdjacencyBuilder.build(geoms, geoms);
         assertEquals(1, adj.edgeCount());
         Connectivity.Repair repair = Connectivity.connect(geoms, adj.a(), adj.b());
@@ -118,39 +154,5 @@ class GeometryTest {
         repair.bridges().forEach(br -> uf.union(br.a(), br.b()));
         assertEquals(1, uf.count());
         assertTrue(new Connectivity.Bridge(1, 2, 30.0) == new Connectivity.Bridge(1, 2, 30.0));
-    }
-
-    private static Map<Long, Double> edges(AdjacencyBuilder.Adjacency adj) {
-        Map<Long, Double> out = new HashMap<>();
-        for (int e = 0; e < adj.edgeCount(); e++) {
-            out.put(AdjacencyBuilder.pairKey(adj.a()[e], adj.b()[e]), adj.length()[e]);
-        }
-        return out;
-    }
-
-    private static double q(double phi) {
-        double s = Math.sin(phi);
-        return (1 - E2) * (s / (1 - E2 * s * s) - (1 / (2 * E)) * Math.log((1 - E * s) / (1 + E * s)));
-    }
-
-    private static double m(double phi) {
-        double s = Math.sin(phi);
-        return Math.cos(phi) / Math.sqrt(1 - E2 * s * s);
-    }
-
-    /** Snyder (1987), eqs. 14-1 to 14-6: ellipsoidal Albers equal-area conic. */
-    private static double[] snyder(double lon, double lat, double lat1, double lat2, double lat0, double lon0) {
-        double p1 = Math.toRadians(lat1);
-        double p2 = Math.toRadians(lat2);
-        double m1 = m(p1);
-        double m2 = m(p2);
-        double q1 = q(p1);
-        double q2 = q(p2);
-        double n = (m1 * m1 - m2 * m2) / (q2 - q1);
-        double c = m1 * m1 + n * q1;
-        double rho0 = A * Math.sqrt(c - n * q(Math.toRadians(lat0))) / n;
-        double rho = A * Math.sqrt(c - n * q(Math.toRadians(lat))) / n;
-        double theta = n * Math.toRadians(lon - lon0);
-        return new double[] {rho * Math.sin(theta), rho0 - rho * Math.cos(theta)};
     }
 }

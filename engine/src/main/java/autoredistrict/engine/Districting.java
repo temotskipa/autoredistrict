@@ -28,6 +28,10 @@ public final class Districting {
      * Share of the state's mean density added to the compactness weight per unit of area.
      */
     static final double AREA_WEIGHT = 0.25;
+    /**
+     * Largest piece a pruning move carries along with the flipped unit.
+     */
+    static final int MAX_PIECE = 40;
     final int[] assign;
     final long[] pop;
     final int[] count;
@@ -69,15 +73,12 @@ public final class Districting {
     private final int[] ufp;
     private final int[] act;
     private final int[] block;
-    private int blockStamp;
     private final int[] seeds2;
-    private int sameCount;
-
-    /** Largest piece a pruning move carries along with the flipped unit. */
-    static final int MAX_PIECE = 40;
     private final int[] piece = new int[MAX_PIECE];
-    private int pieceSize = -1;
     private final int[] moveBuf = new int[MAX_PIECE + 1];
+    private int blockStamp;
+    private int sameCount;
+    private int pieceSize = -1;
     private int bsize;
     private boolean hardBound = true;
     private double wPop = 1;
@@ -286,11 +287,13 @@ public final class Districting {
     
     // ---------------------------------------------------------------- configuration
     
-    /** Turns the hard population rule on or off (on by default). */
+    /**
+     * Turns the hard population rule on or off (on by default).
+     */
     public void setHardBound(boolean on) {
         this.hardBound = on;
     }
-
+    
     public void setWeights(Weights weights) {
         this.wPop = weights.population();
         this.wComp = weights.compactness();
@@ -553,7 +556,7 @@ public final class Districting {
         block[u] = blockStamp;
         return seedsConnect(a, same, m, true);
     }
-
+    
     /**
      * Simultaneous BFS inside district {@code a} from each seed, skipping blocked units. Returns
      * true once all seeds have met. Returns false as soon as one search runs out, which is the
@@ -608,7 +611,7 @@ public final class Districting {
         }
         return groups == 1;
     }
-
+    
     private void collectPiece(int root, int tail) {
         int c = 0;
         for (int i = 0; i < tail; i++) {
@@ -623,7 +626,7 @@ public final class Districting {
         }
         pieceSize = c;
     }
-
+    
     /**
      * After {@link #removalKeepsConnected(int)} returned false for {@code u}: whether the rest of
      * the district (without {@code u} and the small piece it cuts off) is still connected.
@@ -645,7 +648,7 @@ public final class Districting {
         }
         return m == 1 || seedsConnect(assign[u], seeds2, m, false);
     }
-
+    
     /**
      * The pruning move: when flipping {@code u} would cut a small piece (at most
      * {@link #MAX_PIECE} units) off its district, move {@code u} and that piece to {@code b}
@@ -696,14 +699,14 @@ public final class Districting {
         hardBound = hb;
         return ok;
     }
-
+    
     private void nextBlock() {
         if (++blockStamp == Integer.MAX_VALUE) {
             Arrays.fill(block, 0);
             blockStamp = 1;
         }
     }
-
+    
     private int find(int i) {
         while (ufp[i] != i) {
             ufp[i] = ufp[ufp[i]];

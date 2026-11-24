@@ -1,9 +1,9 @@
 plugins {
-    id("autoredistrict.java-conventions")
+	id("autoredistrict.java-conventions")
 }
 
 dependencies {
-    api(project(":data"))
-    implementation(libs.gt.shapefile)
-    implementation(libs.gt.referencing)
+	api(project(":data"))
+	implementation(libs.gt.shapefile)
+	implementation(libs.gt.referencing)
 }

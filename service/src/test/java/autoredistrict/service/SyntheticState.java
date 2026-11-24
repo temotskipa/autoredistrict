@@ -1,37 +1,41 @@
 package autoredistrict.service;
 
-import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryFactory;
-
 import autoredistrict.data.AlbersProjection;
 import autoredistrict.data.BlockVotes.Election;
 import autoredistrict.data.Manifest;
 import autoredistrict.data.StateInfo;
 import autoredistrict.data.TractCache;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
 
-/** Writes a small synthetic state (a grid of 1 km tracts) straight into a cache folder. */
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Writes a small synthetic state (a grid of 1 km tracts) straight into a cache folder.
+ */
 final class SyntheticState {
-
+    
     private SyntheticState() {
     }
-
-    /** A w x h grid; D share falls from 70% at the left to 30% at the right. */
+    
+    /**
+     * A w x h grid; D share falls from 70% at the left to 30% at the right.
+     */
     static void write(Path cache, StateInfo st, int w, int h, int popPerTract) {
         write(cache, st, w, h, popPerTract, 0.0);
     }
-
-    /** As above with every D share shifted by {@code shift}. */
+    
+    /**
+     * As above with every D share shifted by {@code shift}.
+     */
     static void write(Path cache, StateInfo st, int w, int h, int popPerTract, double shift) {
         int n = w * h;
         GeometryFactory gf = new GeometryFactory();
-        TractCache.Tracts t = new TractCache.Tracts(new String[n], new String[n], new int[n], new double[n],
-                new double[n], new double[n], new double[n], new double[n]);
+        TractCache.Tracts t = new TractCache.Tracts(new String[n], new String[n], new int[n], new double[n], new double[n], new double[n], new double[n], new double[n]);
         List<Geometry> geoms = new ArrayList<>();
         double[] dem = new double[n];
         double[] rep = new double[n];
@@ -47,22 +51,19 @@ final class SyntheticState {
                 t.y()[i] = r * 1000 + 500;
                 t.perimeter()[i] = 4000;
                 t.outer()[i] = 1000.0 * ((c == 0 ? 1 : 0) + (c == w - 1 ? 1 : 0) + (r == 0 ? 1 : 0) + (r == h - 1 ? 1 : 0));
-                geoms.add(gf.createPolygon(new Coordinate[] {new Coordinate(c * 1000, r * 1000),
-                    new Coordinate(c * 1000 + 1000, r * 1000), new Coordinate(c * 1000 + 1000, r * 1000 + 1000),
-                    new Coordinate(c * 1000, r * 1000 + 1000), new Coordinate(c * 1000, r * 1000)}));
+                geoms.add(gf.createPolygon(new Coordinate[]{new Coordinate(c * 1000, r * 1000), new Coordinate(c * 1000 + 1000, r * 1000), new Coordinate(c * 1000 + 1000, r * 1000 + 1000), new Coordinate(c * 1000, r * 1000 + 1000), new Coordinate(c * 1000, r * 1000)}));
                 double share = (w == 1 ? 0.6 : 0.7 - 0.4 * c / (w - 1.0)) + shift;
                 dem[i] = 100 * share;
                 rep[i] = 100 * (1 - share);
                 if (c + 1 < w) {
-                    edges.add(new int[] {i, i + 1});
+                    edges.add(new int[]{i, i + 1});
                 }
                 if (r + 1 < h) {
-                    edges.add(new int[] {i, i + w});
+                    edges.add(new int[]{i, i + w});
                 }
             }
         }
-        TractCache.Edges e = new TractCache.Edges(new int[edges.size()], new int[edges.size()],
-                new double[edges.size()], new boolean[edges.size()]);
+        TractCache.Edges e = new TractCache.Edges(new int[edges.size()], new int[edges.size()], new double[edges.size()], new boolean[edges.size()]);
         for (int j = 0; j < edges.size(); j++) {
             e.a()[j] = edges.get(j)[0];
             e.b()[j] = edges.get(j)[1];
@@ -75,11 +76,7 @@ final class SyntheticState {
             d += dem[i];
             rr += rep[i];
         }
-        Manifest m = new Manifest(Manifest.FORMAT, st.abbr(), st.fips(), st.name(), st.seats(), "synthetic test",
-                List.of(), List.of(), "2026-11-24T00:00:00Z", n, (long) n * popPerTract, edges.size(), edges.size(), 0, 1,
-                List.of(), new Manifest.ProjectionInfo(44, 46, 45, -69, p.geographicWkt(), p.wkt()), 25,
-                Map.of("2024", new Manifest.VoteInfo("2024", "synthetic", "", d, rr, d / (d + rr), n, 0, 0, null, null)),
-                List.of());
+        Manifest m = new Manifest(Manifest.FORMAT, st.abbr(), st.fips(), st.name(), st.seats(), "synthetic test", List.of(), List.of(), "2026-11-24T00:00:00Z", n, (long) n * popPerTract, edges.size(), edges.size(), 0, 1, List.of(), new Manifest.ProjectionInfo(44, 46, 45, -69, p.geographicWkt(), p.wkt()), 25, Map.of("2024", new Manifest.VoteInfo("2024", "synthetic", "", d, rr, d / (d + rr), n, 0, 0, null, null)), List.of());
         TractCache.write(cache, st, m, t, e, geoms, Election.Y2024, dem, rep);
     }
 }

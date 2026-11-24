@@ -1,28 +1,12 @@
 package autoredistrict.cli;
 
 import autoredistrict.data.BlockVotes.Election;
-import autoredistrict.data.DataException;
-import autoredistrict.data.StateDataset;
-import autoredistrict.data.StateImporter;
-import autoredistrict.data.StateInfo;
-import autoredistrict.data.States;
-import autoredistrict.data.TractCache;
+import autoredistrict.data.*;
 import autoredistrict.engine.Annealer;
 import autoredistrict.engine.Progress;
-import autoredistrict.service.Artifacts;
-import autoredistrict.service.BatchRunner;
-import autoredistrict.service.ImportService;
-import autoredistrict.service.PlanOptions;
-import autoredistrict.service.PlanResult;
-import autoredistrict.service.PlanService;
-import autoredistrict.service.SeatRange;
+import autoredistrict.service.*;
 import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Mixin;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
-import picocli.CommandLine.ParentCommand;
-import picocli.CommandLine.ScopeType;
+import picocli.CommandLine.*;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -39,20 +23,16 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * The autoredistrict command line. Commands are thin: all work happens in the service module.
  */
-@Command(name = "autoredistrict", mixinStandardHelpOptions = true, version = "autoredistrict 2.0",
-        description = "Seat-targeted congressional maps from Redistricting Data Hub tract data.",
-        subcommands = {Main.ImportCommand.class, Main.RunCommand.class, Main.AllCommand.class,
-                Main.SeatRangeCommand.class})
+@Command(name = "autoredistrict", mixinStandardHelpOptions = true, version = "autoredistrict 2.0", description = "Seat-targeted congressional maps from Redistricting Data Hub tract data.", subcommands = {Main.ImportCommand.class, Main.RunCommand.class, Main.AllCommand.class, Main.SeatRangeCommand.class})
 public final class Main implements Runnable {
-
-    @Option(names = "--cache-dir", description = "Cache folder (default: .cache).", defaultValue = ".cache",
-            scope = ScopeType.INHERIT)
+    
+    @Option(names = "--cache-dir", description = "Cache folder (default: .cache).", defaultValue = ".cache", scope = ScopeType.INHERIT)
     Path cacheDir;
-
+    
     static void main(String[] args) {
         System.exit(run(args));
     }
-
+    
     public static int run(String... args) {
         CommandLine cl = new CommandLine(new Main());
         cl.setExecutionExceptionHandler((ex, cmd, parsed) -> {
@@ -64,12 +44,7 @@ public final class Main implements Runnable {
         });
         return cl.execute(args);
     }
-
-    @Override
-    public void run() {
-        new CommandLine(this).usage(System.out);
-    }
-
+    
     static List<StateInfo> parseStates(String spec) {
         if (spec == null || spec.equalsIgnoreCase("all")) {
             return States.all();
@@ -82,46 +57,7 @@ public final class Main implements Runnable {
         }
         return out;
     }
-
-    /** Options shared by run, all and seat-range. */
-    static final class PlanArgs {
-
-        @Option(names = "--min-margin", defaultValue = "2.0",
-                description = "Two-party margin in points each targeted district should clear (default 2.0).")
-        double minMargin;
-
-        @Option(names = "--seeds", description = "Chains per request, run in parallel (default: cores, max 16).")
-        Integer seeds;
-
-        @Option(names = "--seed", defaultValue = "1", description = "Seed of the first chain (default 1).")
-        long seed;
-
-        @Option(names = "--election", defaultValue = "2024",
-                description = "Presidential race for votes: 2024 (default) or 2020. CA falls back to 2020.")
-        String election;
-
-        @Option(names = "--scale", defaultValue = "1.0", description = "Multiplies the anneal's step counts.")
-        double scale;
-
-        @Option(names = "--budget-min", defaultValue = "12", description = "Per-chain time budget in minutes.")
-        long budgetMinutes;
-
-        @Option(names = "--resolution", defaultValue = "tract", description = "Unit resolution; only tract.")
-        String resolution;
-
-        PlanOptions options(Integer demSeats) {
-            if (!resolution.equalsIgnoreCase("tract")) {
-                throw new DataException("Only --resolution tract is supported.");
-            }
-            return new PlanOptions(demSeats, minMargin, seeds == null ? Annealer.defaultSeeds() : seeds, seed, scale,
-                    Duration.ofMinutes(budgetMinutes), PlanOptions.DEFAULT_TOLERANCE);
-        }
-
-        Election election() {
-            return Election.parse(election);
-        }
-    }
-
+    
     static void writeText(Path file, String text) {
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
@@ -130,8 +66,10 @@ public final class Main implements Runnable {
             throw new UncheckedIOException("Could not write " + file, e);
         }
     }
-
-    /** Prints a progress line now and then (every few seconds) from chain 0. */
+    
+    /**
+     * Prints a progress line now and then (every few seconds) from chain 0.
+     */
     static Progress.Listener consoleProgress(boolean quiet) {
         if (quiet) {
             return Progress.Listener.NONE;
@@ -141,46 +79,78 @@ public final class Main implements Runnable {
             long now = System.nanoTime();
             long prev = last.get();
             if (p.chain() == 0 && now - prev > 5_000_000_000L && last.compareAndSet(prev, now)) {
-                System.out.printf(Locale.ROOT, "  [%s %d/%d] step %,d/%,d  score %.4f  D won %d  max dev %.2f%%  %,.0f flips/s%n",
-                        p.phase(), p.phaseIndex() + 1, p.phaseCount(), p.step(), p.phaseSteps(), p.score(), p.demWon(),
-                        p.maxDeviation() * 100, p.flipsPerSecond());
+                System.out.printf(Locale.ROOT, "  [%s %d/%d] step %,d/%,d  score %.4f  D won %d  max dev %.2f%%  %,.0f flips/s%n", p.phase(), p.phaseIndex() + 1, p.phaseCount(), p.step(), p.phaseSteps(), p.score(), p.demWon(), p.maxDeviation() * 100, p.flipsPerSecond());
             }
         };
     }
-
+    
     static void printResult(PlanResult r) {
-        System.out.printf(Locale.ROOT, "%s (%s): %d districts, requested %d D%s, won %d D–%d R: %s%n",
-                r.state().name(), r.state().abbr(), r.districts(), r.demRequested(),
-                r.proportionalDefault() ? " (proportional)" : "", r.metrics().demWon(), r.metrics().repWon(),
-                r.hit() ? "HIT" : "MISS");
-        System.out.printf(Locale.ROOT, "  max deviation %.3f%%, contiguous %s, assigned once %s, population %,d = %,d: %s; "
-                        + "closest margin %.2f pts%n", r.metrics().maxDeviation() * 100, r.metrics().allContiguous(),
-                r.metrics().assignedOnce(), r.metrics().population(), r.metrics().importedPopulation(),
-                r.metrics().populationMatches(), r.metrics().closestMargin());
-        System.out.printf(Locale.ROOT, "  votes %s (statewide D share %.4f); %d seeds, %d hit; %,d flips in %.1f s = %,.0f flips/s%n",
-                r.voteData(), r.statewideDemShare(), r.seeds(), r.chainsHit(), r.proposals(), r.seconds(),
-                r.flipsPerSecond());
+        System.out.printf(Locale.ROOT, "%s (%s): %d districts, requested %d D%s, won %d D–%d R: %s%n", r.state().name(), r.state().abbr(), r.districts(), r.demRequested(), r.proportionalDefault() ? " (proportional)" : "", r.metrics().demWon(), r.metrics().repWon(), r.hit() ? "HIT" : "MISS");
+        System.out.printf(Locale.ROOT, "  max deviation %.3f%%, contiguous %s, assigned once %s, population %,d = %,d: %s; " + "closest margin %.2f pts%n", r.metrics().maxDeviation() * 100, r.metrics().allContiguous(), r.metrics().assignedOnce(), r.metrics().population(), r.metrics().importedPopulation(), r.metrics().populationMatches(), r.metrics().closestMargin());
+        System.out.printf(Locale.ROOT, "  votes %s (statewide D share %.4f); %d seeds, %d hit; %,d flips in %.1f s = %,.0f flips/s%n", r.voteData(), r.statewideDemShare(), r.seeds(), r.chainsHit(), r.proposals(), r.seconds(), r.flipsPerSecond());
         System.out.println("  schedule: " + r.schedule());
         r.warnings().forEach(w -> System.out.println("  warning: " + w));
         System.out.println("  PASS: " + (r.pass(PlanOptions.DEFAULT_TOLERANCE) ? "yes" : "NO"));
     }
-
-    @Command(name = "import", mixinStandardHelpOptions = true,
-            description = "Import RDH tract zips and vote files from a download folder into the cache.")
+    
+    @Override
+    public void run() {
+        new CommandLine(this).usage(System.out);
+    }
+    
+    /**
+     * Options shared by run, all and seat-range.
+     */
+    static final class PlanArgs {
+        
+        @Option(names = "--min-margin", defaultValue = "2.0", description = "Two-party margin in points each targeted district should clear (default 2.0).")
+        double minMargin;
+        
+        @Option(names = "--seeds", description = "Chains per request, run in parallel (default: cores, max 16).")
+        Integer seeds;
+        
+        @Option(names = "--seed", defaultValue = "1", description = "Seed of the first chain (default 1).")
+        long seed;
+        
+        @Option(names = "--election", defaultValue = "2024", description = "Presidential race for votes: 2024 (default) or 2020. CA falls back to 2020.")
+        String election;
+        
+        @Option(names = "--scale", defaultValue = "1.0", description = "Multiplies the anneal's step counts.")
+        double scale;
+        
+        @Option(names = "--budget-min", defaultValue = "12", description = "Per-chain time budget in minutes.")
+        long budgetMinutes;
+        
+        @Option(names = "--resolution", defaultValue = "tract", description = "Unit resolution; only tract.")
+        String resolution;
+        
+        PlanOptions options(Integer demSeats) {
+            if (!resolution.equalsIgnoreCase("tract")) {
+                throw new DataException("Only --resolution tract is supported.");
+            }
+            return new PlanOptions(demSeats, minMargin, seeds == null ? Annealer.defaultSeeds() : seeds, seed, scale, Duration.ofMinutes(budgetMinutes), PlanOptions.DEFAULT_TOLERANCE);
+        }
+        
+        Election election() {
+            return Election.parse(election);
+        }
+    }
+    
+    @Command(name = "import", mixinStandardHelpOptions = true, description = "Import RDH tract zips and vote files from a download folder into the cache.")
     static final class ImportCommand implements Callable<Integer> {
-
+        
         @ParentCommand
         Main parent;
-
+        
         @Option(names = "--rdh-dir", required = true, description = "Folder with the RDH downloads.")
         Path rdhDir;
-
+        
         @Option(names = "--states", defaultValue = "all", description = "Comma-separated states, or all (default).")
         String states;
-
+        
         @Option(names = "--parallel", defaultValue = "6", description = "States imported at once (default 6).")
         int parallel;
-
+        
         @Override
         public Integer call() throws Exception {
             List<StateInfo> list = parseStates(states);
@@ -195,37 +165,33 @@ public final class Main implements Runnable {
             }
             System.out.println();
             System.out.print(ImportService.summaryTable(rows));
-            rows.stream().filter(r -> !r.warnings().isEmpty()).forEach(r -> r.warnings()
-                    .forEach(w -> System.out.println("warning " + r.state().abbr() + ": " + w)));
-            System.out.printf(Locale.ROOT, "%nImported %d of %d states in %.1f s.%n",
-                    rows.stream().filter(StateImporter.ImportSummary::ok).count(), rows.size(),
-                    (System.nanoTime() - t0) / 1e9);
+            rows.stream().filter(r -> !r.warnings().isEmpty()).forEach(r -> r.warnings().forEach(w -> System.out.println("warning " + r.state().abbr() + ": " + w)));
+            System.out.printf(Locale.ROOT, "%nImported %d of %d states in %.1f s.%n", rows.stream().filter(StateImporter.ImportSummary::ok).count(), rows.size(), (System.nanoTime() - t0) / 1e9);
             return rows.stream().allMatch(StateImporter.ImportSummary::ok) ? 0 : 1;
         }
     }
-
-    @Command(name = "run", mixinStandardHelpOptions = true,
-            description = "Draw one state's map for a requested number of Democratic seats.")
+    
+    @Command(name = "run", mixinStandardHelpOptions = true, description = "Draw one state's map for a requested number of Democratic seats.")
     static final class RunCommand implements Callable<Integer> {
-
+        
         @ParentCommand
         Main parent;
-
+        
         @Parameters(index = "0", description = "State, e.g. NC.")
         String state;
-
+        
         @Option(names = "--dem-seats", description = "Democratic seats to deliver (default: proportional).")
         Integer demSeats;
-
+        
         @Option(names = "--out-dir", defaultValue = "out", description = "Where to write the map and reports.")
         Path outDir;
-
+        
         @Option(names = "--quiet", description = "No progress lines.")
         boolean quiet;
-
+        
         @Mixin
         PlanArgs args = new PlanArgs();
-
+        
         @Override
         public Integer call() throws Exception {
             StateInfo st = States.require(state);
@@ -241,58 +207,56 @@ public final class Main implements Runnable {
             return r.pass(PlanOptions.DEFAULT_TOLERANCE) ? 0 : 1;
         }
     }
-
-    @Command(name = "all", mixinStandardHelpOptions = true,
-            description = "Run every imported state at its proportional default and write a summary and contact sheet.")
+    
+    @Command(name = "all", mixinStandardHelpOptions = true, description = "Run every imported state at its proportional default and write a summary and contact sheet.")
     static final class AllCommand implements Callable<Integer> {
-
+        
         @ParentCommand
         Main parent;
-
+        
         @Option(names = "--out-dir", defaultValue = "out/all", description = "Output folder.")
         Path outDir;
-
+        
         @Option(names = "--states", defaultValue = "all", description = "Comma-separated states, or all (default).")
         String states;
-
+        
         @Mixin
         PlanArgs args = new PlanArgs();
-
+        
         @Override
         public Integer call() throws Exception {
             List<StateInfo> list = new ArrayList<>();
             for (StateInfo s : parseStates(states)) {
                 if (TractCache.isImported(parent.cacheDir, s)) {
                     list.add(s);
-                } else {
+                }
+                else {
                     System.out.println("skipping " + s.abbr() + ": not imported");
                 }
             }
-            BatchRunner.Summary s = BatchRunner.run(new PlanService(parent.cacheDir), list, args.options(null),
-                    args.election(), outDir, System.out::println);
+            BatchRunner.Summary s = BatchRunner.run(new PlanService(parent.cacheDir), list, args.options(null), args.election(), outDir, System.out::println);
             System.out.println();
             System.out.print(BatchRunner.markdown(s));
             System.out.println("wrote " + outDir.resolve("summary.md") + ", summary.csv, contact-sheet.png");
             return s.passCount() == s.rows().size() ? 0 : 1;
         }
     }
-
-    @Command(name = "seat-range", mixinStandardHelpOptions = true,
-            description = "Request the proportional seat count, then step outward until a request misses.")
+    
+    @Command(name = "seat-range", mixinStandardHelpOptions = true, description = "Request the proportional seat count, then step outward until a request misses.")
     static final class SeatRangeCommand implements Callable<Integer> {
-
+        
         @ParentCommand
         Main parent;
-
+        
         @Parameters(index = "0", description = "State, e.g. NC.")
         String state;
-
+        
         @Option(names = "--out-dir", defaultValue = "out/seat-range", description = "Output folder.")
         Path outDir;
-
+        
         @Mixin
         PlanArgs args = new PlanArgs();
-
+        
         @Override
         public Integer call() throws Exception {
             StateInfo st = States.require(state);
@@ -305,9 +269,7 @@ public final class Main implements Runnable {
                 PlanResult r = svc.runUntilHit(ds, args.options(n), Progress.Listener.NONE);
                 Artifacts.write(r, ds, dir, st.key() + "-" + n + "d", false);
                 SeatRange.Row row = SeatRange.rowOf(r, PlanOptions.DEFAULT_TOLERANCE);
-                System.out.printf(Locale.ROOT, "%s requested %d D: won %d D–%d R, %s, max dev %.3f%%, %.1f s%n",
-                        st.abbr(), n, row.demWon(), row.repWon(), row.counts() ? "HIT" : "miss",
-                        row.maxDeviation() * 100, row.seconds());
+                System.out.printf(Locale.ROOT, "%s requested %d D: won %d D–%d R, %s, max dev %.3f%%, %.1f s%n", st.abbr(), n, row.demWon(), row.repWon(), row.counts() ? "HIT" : "miss", row.maxDeviation() * 100, row.seconds());
                 return row;
             });
             String table = SeatRange.table(st.abbr(), k, rows);

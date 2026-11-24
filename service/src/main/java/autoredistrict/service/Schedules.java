@@ -23,10 +23,10 @@ public final class Schedules {
     /**
      * Proposals per tract in each phase at scale 1.
      */
-    public static final long SHAPE_PER_TRACT = 400;
-    public static final long EXPLORE_PER_TRACT = 400;
-    public static final long ELECT_PER_TRACT = 1200;
-    public static final long EXTRA_PER_TRACT = 800;
+    public static final long SHAPE_PER_TRACT = 1200;
+    public static final long EXPLORE_PER_TRACT = 1200;
+    public static final long ELECT_PER_TRACT = 3600;
+    public static final long EXTRA_PER_TRACT = 2400;
     
     public static final Weights SHAPE = new Weights(1, 50, 2, 0);
     public static final Weights EXPLORE = new Weights(1, 20, 0.5, 0.3);

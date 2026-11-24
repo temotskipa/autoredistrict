@@ -46,11 +46,7 @@ public final class Chain {
             // bound (so surplus can pass through full districts), weigh population 10x, and run
             // at the final temperature until every district is inside.
             Phase last = phases.getLast();
-            Phase ph = repair
-                    ? new Phase("repair", schedule.extraSteps(), new Weights(10 * last.weights().population(),
-                            last.weights().compactness(), last.weights().tension(), last.weights().election()),
-                            last.startAcceptance(), 1.0, last.selectionBias(), false)
-                    : phases.get(pi);
+            Phase ph = repair ? new Phase("repair", schedule.extraSteps(), new Weights(10 * last.weights().population(), last.weights().compactness(), last.weights().tension(), last.weights().election()), last.startAcceptance(), 1.0, last.selectionBias(), false) : phases.get(pi);
             d.setWeights(ph.weights());
             d.setHardBound(ph.hardBound());
             d.recomputeTerms();

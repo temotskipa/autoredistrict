@@ -1,9 +1,13 @@
 package autoredistrict.service;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import autoredistrict.data.BlockVotes.Election;
+import autoredistrict.data.StateDataset;
+import autoredistrict.data.StateInfo;
+import autoredistrict.data.States;
+import autoredistrict.engine.Graph;
+import autoredistrict.engine.Progress;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -11,31 +15,23 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.SplittableRandom;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
-import autoredistrict.data.BlockVotes.Election;
-import autoredistrict.data.StateDataset;
-import autoredistrict.data.StateInfo;
-import autoredistrict.data.States;
-import autoredistrict.engine.Graph;
-import autoredistrict.engine.Progress;
+import static org.junit.jupiter.api.Assertions.*;
 
 class PlanServiceTest {
-
+    
     @TempDir
     Path tmp;
-
+    
     private PlanOptions fast(Integer dem) {
         return PlanOptions.defaults().withDemSeats(dem).withSeeds(2).withScale(2.0);
     }
-
+    
     @Test
     void graphVoronoiGivesKContiguousNonEmptyDistricts() {
         StateInfo me = States.require("ME");
         SyntheticState.write(tmp, me, 20, 15, 1000);
         Graph g = StateDataset.load(tmp, me, Election.Y2024).graph();
-        for (int k : new int[] {2, 5, 13}) {
+        for (int k : new int[]{2, 5, 13}) {
             int[] a = GraphVoronoi.INSTANCE.assign(g, k, new SplittableRandom(k));
             boolean[] ok = PlanMetrics.contiguity(g, a, k);
             int[] sizes = new int[k];
@@ -49,7 +45,7 @@ class PlanServiceTest {
             assertArrayEquals(a, GraphVoronoi.INSTANCE.assign(g, k, new SplittableRandom(k)), "deterministic");
         }
     }
-
+    
     @Test
     void atLargeStatesAreOneDistrictWithoutAnAnneal() throws InterruptedException {
         StateInfo vt = States.require("VT");
@@ -68,7 +64,7 @@ class PlanServiceTest {
         assertEquals(1, r.demRequested(), "D share 0.6 rounds to the single seat");
         assertTrue(r.hit());
     }
-
+    
     @Test
     void proportionalDefaultIsRoundedAndClamped() {
         assertEquals(7, PlanOptions.proportional(0.4837, 14)); // NC 2024: 6.77
@@ -79,7 +75,7 @@ class PlanServiceTest {
         assertEquals(0, PlanOptions.proportional(0.45, 1));
         assertEquals(1, PlanOptions.proportional(0.5, 1));
     }
-
+    
     @Test
     void runsATwoDistrictStateToAPassingPlanAndWritesArtifacts() throws Exception {
         StateInfo me = States.require("ME");
@@ -96,7 +92,7 @@ class PlanServiceTest {
         }
         assertTrue(Files.readString(tmp.resolve("out/me.geojson")).contains("\"FeatureCollection\""));
     }
-
+    
     @Test
     void seatRangeStepsOutwardAndStopsEachDirectionAtTheFirstMiss() throws InterruptedException {
         List<Integer> asked = new ArrayList<>();
@@ -125,7 +121,7 @@ class PlanServiceTest {
         String table = SeatRange.table("NC", 14, rows);
         assertTrue(table.contains("5 distinct D seat counts hit: [3, 4, 5, 6, 7]"), table);
     }
-
+    
     @Test
     void batchRunsEveryStateAndSummarisesPassesHitsAndTime() throws Exception {
         StateInfo me = States.require("ME");
@@ -134,8 +130,7 @@ class PlanServiceTest {
         SyntheticState.write(tmp, vt, 5, 5, 1000);
         Path out = tmp.resolve("all");
         List<String> log = new ArrayList<>();
-        BatchRunner.Summary s = BatchRunner.run(new PlanService(tmp), List.of(me, vt, States.require("NH")),
-                fast(null), Election.Y2024, out, log::add);
+        BatchRunner.Summary s = BatchRunner.run(new PlanService(tmp), List.of(me, vt, States.require("NH")), fast(null), Election.Y2024, out, log::add);
         assertEquals(3, s.rows().size());
         assertEquals("PASS", s.rows().get(0).status());
         assertEquals("PASS", s.rows().get(1).status());
@@ -148,8 +143,7 @@ class PlanServiceTest {
         assertTrue(Files.size(out.resolve("contact-sheet.png")) > 0);
         assertTrue(Files.readString(out.resolve("summary.csv")).startsWith("state,fips,seats"));
         assertTrue(Files.exists(out.resolve("states/me.png")));
-        BatchRunner.Row slow = new BatchRunner.Row("XX", "99", 2, 10, 10, 0.1, true, true, true, 1, 1, 1, true, 3, 1,
-                BatchRunner.STATE_LIMIT_SECONDS + 1, "2024", "PASS", null);
+        BatchRunner.Row slow = new BatchRunner.Row("XX", "99", 2, 10, 10, 0.1, true, true, true, 1, 1, 1, true, 3, 1, BatchRunner.STATE_LIMIT_SECONDS + 1, "2024", "PASS", null);
         assertFalse(new BatchRunner.Summary(List.of(slow), 1, 2).slowest() == null);
     }
 }

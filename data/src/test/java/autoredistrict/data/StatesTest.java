@@ -1,16 +1,18 @@
 package autoredistrict.data;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.OptionalInt;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Ported from the Python tests/test_apportionment.py. */
+/**
+ * Ported from the Python tests/test_apportionment.py.
+ */
 class StatesTest {
-
+    
     @Test
     void apportionment2020Has50StatesSummingTo435() {
         Map<String, Integer> table = States.apportionment2020();
@@ -20,7 +22,7 @@ class StatesTest {
         assertTrue(table.values().stream().allMatch(s -> s >= 1));
         assertEquals(6, States.all().stream().filter(StateInfo::atLarge).count(), "AK, DE, ND, SD, VT, WY");
     }
-
+    
     @Test
     void returnsOfficial2020Counts() {
         assertEquals(OptionalInt.of(2), States.apportionedSeats("30")); // Montana
@@ -31,7 +33,7 @@ class StatesTest {
         assertEquals(OptionalInt.of(38), States.apportionedSeats("48")); // Texas
         assertEquals(OptionalInt.of(7), States.apportionedSeats("1"));
     }
-
+    
     @Test
     void outsideTheTableIsEmpty() {
         assertEquals(OptionalInt.empty(), States.apportionedSeats("11")); // DC
@@ -40,7 +42,7 @@ class StatesTest {
         assertEquals(OptionalInt.empty(), States.apportionedSeats(null));
         assertEquals(OptionalInt.empty(), States.apportionedSeats(""));
     }
-
+    
     @Test
     void findsByAbbreviationOrFips() {
         assertEquals("23", States.require("me").fips());
@@ -49,7 +51,7 @@ class StatesTest {
         assertTrue(StateInfo.class.isValue());
         assertTrue(States.require("ME") == new StateInfo("ME", "23", "Maine", 2));
     }
-
+    
     @Test
     void geoidsArePaddedOnlyWhenOneShort() {
         assertEquals("01001020100", GeoIds.normalize("1001020100"));

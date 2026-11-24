@@ -82,6 +82,9 @@ public record PlanService(Path cacheRoot) {
                 warnings.add("A chain stopped at its time budget of " + o.timeBudget().toMinutes() + " min.");
             }
         }
+        if (k > 1) {
+            EmptyTractCleanup.apply(g, assignment, k);
+        }
         PlanMetrics m = PlanMetrics.compute(ds, assignment, k);
         double secs = (System.nanoTime() - t0) / 1e9;
         return new PlanResult(st, k, dem, o.demSeats() == null, o.minMargin(), ds.voteDataLabel(), share, m, assignment, seeds, o.baseSeed(), bestChain, chainsHit, proposals, secs > 0 ? proposals / secs : 0, secs, schedule, k == 1, timedOut, List.copyOf(warnings));
