@@ -13,6 +13,7 @@ atlantafx = "3.0.0"
 jts-core = { module = "org.locationtech.jts:jts-core", version.ref = "jts" }
 gt-shapefile = { module = "org.geotools:gt-shapefile", version.ref = "geotools" }
 gt-referencing = { module = "org.geotools:gt-referencing", version.ref = "geotools" }
+gt-api = { module = "org.geotools:gt-api", version.ref = "geotools" }
 gt-main = { module = "org.geotools:gt-main", version.ref = "geotools" }
 picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
 jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }

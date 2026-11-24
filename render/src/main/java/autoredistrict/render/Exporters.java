@@ -1,6 +1,5 @@
 package autoredistrict.render;
 
-import autoredistrict.data.Json;
 import org.geotools.api.data.FeatureWriter;
 import org.geotools.api.data.Transaction;
 import org.geotools.api.feature.simple.SimpleFeature;
@@ -11,6 +10,8 @@ import org.geotools.data.shapefile.ShapefileDataStoreFactory;
 import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
 import org.geotools.referencing.CRS;
 import org.locationtech.jts.geom.*;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -30,7 +31,9 @@ import java.util.function.Function;
  * District exports: GeoJSON (WGS84-style lon/lat), ESRI shapefile (projected), assignment CSV.
  */
 public final class Exporters {
-    
+
+    private static final LazyConstant<JsonMapper> JSON = LazyConstant.of(() -> JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build());
+
     private Exporters() {
     }
     
@@ -39,7 +42,7 @@ public final class Exporters {
      * projected geometries (the state's Albers) to longitude/latitude.
      */
     public static void geoJson(Path file, Geometry[] districts, List<DistrictProps> props, Function<Geometry, Geometry> toLonLat) {
-        ObjectNode root = Json.mapper().createObjectNode();
+        ObjectNode root = JSON.get().createObjectNode();
         root.put("type", "FeatureCollection");
         ArrayNode features = root.putArray("features");
         for (int d = 0; d < districts.length; d++) {
@@ -56,14 +59,14 @@ public final class Exporters {
             f.set("geometry", geometry(toLonLat.apply(districts[d])));
         }
         try (OutputStream out = Files.newOutputStream(file)) {
-            Json.mapper().writeValue(out, root);
+            JSON.get().writeValue(out, root);
         } catch (IOException e) {
             throw new UncheckedIOException("Could not write " + file, e);
         }
     }
     
     private static ObjectNode geometry(Geometry g) {
-        ObjectNode node = Json.mapper().createObjectNode();
+        ObjectNode node = JSON.get().createObjectNode();
         node.put("type", "MultiPolygon");
         ArrayNode polys = node.putArray("coordinates");
         for (int i = 0; i < g.getNumGeometries(); i++) {

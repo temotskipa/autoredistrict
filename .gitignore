@@ -1,7 +1,6 @@
 # Gradle and build output
 .gradle/
 build/
-buildSrc/.kotlin/
 .kotlin/
 
 # Imported data, plan artifacts and maps (never committed)
@@ -15,9 +14,3 @@ out/
 .idea/
 .vscode/
 *.iml
-
-# Python leftovers until the Python app is deleted
-__pycache__/
-*.pyc
-.venv/
-.pytest_cache/
