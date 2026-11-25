@@ -9,6 +9,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Function;
 
@@ -72,6 +73,10 @@ class PlanServiceTest {
         }
         assertThrows(IllegalArgumentException.class, () -> o.withScale(-1));
         assertEquals(3.0, o.withScale(3.0).scheduleScale());
+        // A budget that isn't positive would end every chain before its first step.
+        for (Duration bad : new Duration[]{Duration.ofMinutes(-5), Duration.ZERO}) {
+            assertThrows(IllegalArgumentException.class, () -> new PlanOptions(null, 2.0, 2, 1, 1.0, bad, PlanOptions.DEFAULT_TOLERANCE), "budget " + bad);
+        }
     }
     
     @Test

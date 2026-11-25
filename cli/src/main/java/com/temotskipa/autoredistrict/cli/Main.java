@@ -44,7 +44,8 @@ public final class Main implements Runnable {
     }
     
     /**
-     * Parses "all" or a comma-separated list; a state named twice (NC,nc,37) is kept once.
+     * Parses "all" or a comma-separated list; a state named twice (NC,nc,37) is kept once. A list
+     * that names no state (an empty value, or only commas) is an error.
      */
     static List<StateInfo> parseStates(String spec) {
         if (spec == null || spec.equalsIgnoreCase("all")) {
@@ -55,6 +56,9 @@ public final class Main implements Runnable {
             if (!s.isBlank()) {
                 out.add(States.require(s.strip()));
             }
+        }
+        if (out.isEmpty()) {
+            throw new DataException("--states names no state. Give all, or a comma-separated list such as ME,NC,37.");
         }
         return List.copyOf(out);
     }

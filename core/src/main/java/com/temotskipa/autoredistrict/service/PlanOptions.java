@@ -12,7 +12,7 @@ import java.time.Duration;
  * @param seeds         chains run in parallel; the best is kept
  * @param baseSeed      seed of chain 0; chain i uses baseSeed + i
  * @param scheduleScale multiplies the step counts (1 = default)
- * @param timeBudget    per-chain wall-clock limit
+ * @param timeBudget    per-chain wall-clock limit, positive (null for none)
  * @param tolerance     population tolerance as a fraction (0.01 = 1%)
  */
 public record PlanOptions(Integer demSeats, double minMargin, int seeds, long baseSeed, double scheduleScale, Duration timeBudget, double tolerance) {
@@ -34,6 +34,10 @@ public record PlanOptions(Integer demSeats, double minMargin, int seeds, long ba
         }
         if (!(tolerance > 0 && tolerance < 1)) {
             throw new IllegalArgumentException("the population tolerance must be between 0 and 1, not " + tolerance);
+        }
+        // A budget that isn't positive would stop every chain before its first step.
+        if (timeBudget != null && !timeBudget.isPositive()) {
+            throw new IllegalArgumentException("--budget-min must be at least 1 minute, not " + timeBudget.toMinutes());
         }
     }
     

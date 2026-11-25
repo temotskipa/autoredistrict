@@ -19,6 +19,13 @@ class RdhTractImporterTest {
     Path tmp;
     
     @Test
+    void importingNoStatesIsAnError() {
+        DataException e = assertThrows(DataException.class, () -> StateImporter.importAll(tmp, List.of(), tmp.resolve("cache"), 1, _ -> {
+        }));
+        assertTrue(e.getMessage().startsWith("No states to import."), e.getMessage());
+    }
+    
+    @Test
     void importsShapefileZipIntoCacheReadableWithoutNetwork() throws Exception {
         List<Fixtures.Tract> tracts = Fixtures.grid("23", 4);
         Path zip = Fixtures.tractZip(tmp, "me_pl2020_t", tracts);

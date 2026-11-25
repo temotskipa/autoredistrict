@@ -184,6 +184,9 @@ public final class StateImporter {
      * failures are recorded in the summary rather than stopping the others.
      */
     public static List<ImportResult> importAll(Path rdhDir, List<StateInfo> states, Path cacheRoot, int parallel, Consumer<String> log) throws InterruptedException {
+        if (states.isEmpty()) {
+            throw new DataException("No states to import. Choose at least one state's RDH files (their names start with the state, like me_pl2020_t.zip).");
+        }
         // Each state imports once: two parallel imports of one state would race on its cache folder.
         states = List.copyOf(new LinkedHashSet<>(states));
         List<String> missing = RdhFiles.missing(rdhDir, states);
@@ -222,7 +225,11 @@ public final class StateImporter {
             Map<String, Manifest.VoteInfo> v2020 = import2020(RdhFiles.national2020(rdhDir), imported, cacheRoot);
             log.accept(String.format(Locale.ROOT, "summed %s for %d states in %.1f s", RdhFiles.NATIONAL_2020, v2020.size(), (System.nanoTime() - t0) / 1e9));
             for (int i = 0; i < results.size(); i++) {
-                if (!(results.get(i) instanceof ImportSummary(var state, var tracts, var population, var edges, var bridges, var components, var fallbackPairs, var election, var dem, var rep, var withoutVotes, var blocksOutside, var seconds, var warnings))) {
+                if (!(results.get(i) instanceof ImportSummary(
+                        var state, var tracts, var population, var edges, var bridges, var components,
+                        var fallbackPairs, var election, var dem, var rep, var withoutVotes, var blocksOutside,
+                        var seconds, var warnings
+                ))) {
                     continue;
                 }
                 Manifest.VoteInfo v = v2020.get(state.abbr());
