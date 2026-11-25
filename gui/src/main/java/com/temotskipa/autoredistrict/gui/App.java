@@ -3,6 +3,7 @@ package com.temotskipa.autoredistrict.gui;
 import atlantafx.base.theme.PrimerLight;
 import com.temotskipa.autoredistrict.data.BlockVotes.Election;
 import com.temotskipa.autoredistrict.data.StateDataset;
+import com.temotskipa.autoredistrict.data.StateImporter.ImportResult;
 import com.temotskipa.autoredistrict.data.StateInfo;
 import com.temotskipa.autoredistrict.data.States;
 import com.temotskipa.autoredistrict.data.TractCache;
@@ -430,10 +431,18 @@ public final class App extends Application {
         for (File f : files) {
             States.find(f.getName().substring(0, 2)).ifPresent(states::add);
         }
-        Task<String> t = importTask(dir, states);
+        Task<List<ImportResult>> t = importTask(dir, states);
         t.setOnSucceeded(_ -> {
             afterImport(states);
-            statusLabel.setText("Imported " + states.size() + " state(s) from " + dir);
+            List<ImportResult> results = t.getValue();
+            List<String> failed = ImportService.failures(results);
+            statusLabel.setText("Imported " + (results.size() - failed.size()) + " of " + results.size() + " state(s) from " + dir);
+            if (!failed.isEmpty()) {
+                // A state that fails doesn't stop the others, so the task succeeds; say which failed.
+                var a = new Alert(Alert.AlertType.ERROR, String.join("\n", failed));
+                a.setHeaderText("Import failed for " + failed.size() + " of " + results.size() + " state(s)");
+                a.show();
+            }
         });
         t.setOnFailed(_ -> {
             afterImport(states);
@@ -448,11 +457,11 @@ public final class App extends Application {
     /**
      * The import as a background task that reports each step in the status line.
      */
-    private Task<String> importTask(Path dir, List<StateInfo> states) {
+    private Task<List<ImportResult>> importTask(Path dir, List<StateInfo> states) {
         return new Task<>() {
             @Override
-            protected String call() throws Exception {
-                return ImportService.summaryTable(ImportService.importFolder(dir, states, opts.cacheDir(), 4, msg -> Platform.runLater(() -> statusLabel.setText(msg))));
+            protected List<ImportResult> call() throws Exception {
+                return ImportService.importFolder(dir, states, opts.cacheDir(), 4, msg -> Platform.runLater(() -> statusLabel.setText(msg)));
             }
         };
     }

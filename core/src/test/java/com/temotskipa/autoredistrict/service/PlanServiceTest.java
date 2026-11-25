@@ -194,7 +194,10 @@ class PlanServiceTest {
         assertEquals("FAIL", status.apply(new BatchRunner.Failed(List.of())));
         assertEquals("ERROR: not in the cache", status.apply(new BatchRunner.Errored("not in the cache")));
         
-        String table = ImportService.summaryTable(List.of(new StateImporter.ImportFailure(States.require("VT"), 1.5, "bad zip")));
+        List<StateImporter.ImportResult> failedImport = List.of(new StateImporter.ImportFailure(States.require("VT"), 1.5, "bad zip"));
+        assertEquals(List.of("VT: bad zip"), ImportService.failures(failedImport));
+        assertEquals(List.of(), ImportService.failures(List.of()));
+        String table = ImportService.summaryTable(failedImport);
         assertTrue(table.contains("| VT | 50 | | | | | | | | | | | | | 1.5 | FAILED: bad zip |"), table);
         assertTrue(table.contains("| 0 states |"), table);
         

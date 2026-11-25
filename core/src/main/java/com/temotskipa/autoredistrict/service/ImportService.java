@@ -24,6 +24,17 @@ public final class ImportService {
     }
     
     /**
+     * One line per state that failed to import ("VT: the error"), empty when every state imported.
+     */
+    public static List<String> failures(List<ImportResult> rows) {
+        return rows.stream().<String>mapMulti((r, out) -> {
+            if (r instanceof ImportFailure(var state, var _, var error)) {
+                out.accept(state.abbr() + ": " + error);
+            }
+        }).toList();
+    }
+    
+    /**
      * Markdown table with one row per state, plus a totals row. A failed state shows only its time
      * and error.
      */

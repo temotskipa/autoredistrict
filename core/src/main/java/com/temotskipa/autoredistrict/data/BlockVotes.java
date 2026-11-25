@@ -104,10 +104,10 @@ public final class BlockVotes {
             }
             Acc acc = accs.computeIfAbsent(fips, _ -> new Acc());
             acc.blocks++;
-            double d = Csv.number(picked[pos[1]], "the D column", source);
-            double r = Csv.number(picked[pos[2]], "the R column", source);
+            double d = Csv.count(picked[pos[1]], "the D column", source);
+            double r = Csv.count(picked[pos[2]], "the R column", source);
             if (popCol >= 0) {
-                acc.totPop += Csv.number(picked[pos[3]], "TOT_POP", source);
+                acc.totPop += Csv.count(picked[pos[3]], "TOT_POP", source);
             }
             String tract = block.substring(0, GeoIds.TRACT_WIDTH);
             if ((onlyFips != null && !fips.equals(onlyFips)) || !tracts.contains(tract)) {

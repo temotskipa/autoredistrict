@@ -130,9 +130,10 @@ public final class Csv {
     }
     
     /**
-     * Parses a number field; blank means 0.
+     * Parses a count field (votes, population); blank means 0. A value that isn't a finite number
+     * of zero or more is an error naming the file and column.
      */
-    public static double number(String field, String column, String source) {
+    public static double count(String field, String column, String source) {
         String s = field == null ? "" : field.strip();
         if (s.isEmpty()) {
             return 0;
@@ -146,6 +147,10 @@ public final class Csv {
         // parseDouble accepts NaN and Infinity, which would poison every sum they reach.
         if (!Double.isFinite(v)) {
             throw new DataException(source + " has a non-finite value '" + s + "' in " + column + ".");
+        }
+        // A negative count would push shares outside [0, 1] while the state's totals still look fine.
+        if (v < 0) {
+            throw new DataException(source + " has a negative value '" + s + "' in " + column + ".");
         }
         return v;
     }

@@ -68,6 +68,16 @@ class BlockVotesTest {
     }
     
     @Test
+    void negativeVoteCountsAreAnErrorNamingFileAndColumn() {
+        String csv = """
+                     GEOID20,G24PREDHAR,G24PRERTRU
+                     230010001001000,5,-3
+                     """;
+        DataException e = assertThrows(DataException.class, () -> BlockVotes.read2024(new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)), "me.csv", "23", Set.of("23001000100")));
+        assertEquals("me.csv has a negative value '-3' in the R column.", e.getMessage());
+    }
+    
+    @Test
     void fileWithoutPresidentialColumnsIsAnErrorNamingIt() {
         DataException e = assertThrows(DataException.class, () -> BlockVotes.read2024(Fixtures.resource("/votes/no_president.csv"), "xx_2024_gen_2020_blocks.csv", "23", Set.of()));
         assertTrue(e.getMessage().startsWith("xx_2024_gen_2020_blocks.csv has neither"), e.getMessage());
