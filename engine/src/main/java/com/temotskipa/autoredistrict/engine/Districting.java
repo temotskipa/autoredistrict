@@ -523,7 +523,7 @@ public final class Districting {
         block[u] = blockStamp;
         return seedsConnect(assign[u], same, sameCount);
     }
-
+    
     /**
      * Whether removing {@code u} cuts a piece of at most {@link #MAX_PIECE} units off its district,
      * kept in {@link #piece} for {@link #tryPieceMove}. Like {@link #removalKeepsConnected} it
@@ -590,7 +590,7 @@ public final class Districting {
         }
         return false;
     }
-
+    
     /**
      * Collects {@code u}'s same-district neighbours in {@link #same} and returns true if there is
      * at most one or they are connected through each other, the cheap case in which removing
@@ -987,7 +987,7 @@ public final class Districting {
     }
     
     // Test hook.
-
+    
     long populationOf(int d) {
         return pop[d];
     }

@@ -151,11 +151,11 @@ preview and launch flags) live in the `build-logic` included build.
 | `cli`    | picocli front end.                                                                                                                                                                        |
 | `gui`    | JavaFX front end.                                                                                                                                                                         |
 
-| `core` package | Contents                                                                                                                                                          |
-|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `core` package | Contents                                                                                                                                                           |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `data`         | RDH import (GeoTools), the per-state Albers equal-area projection, adjacency, connectivity repair, block votes to tracts, the cache, the 2020 apportionment table. |
-| `render`       | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI.                                                        |
-| `service`      | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts.                                                  |
+| `render`       | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI.                                                         |
+| `service`      | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts.                                                   |
 
 Both applications run on the module path (`--module com.temotskipa.autoredistrict.cli/...`), which is what JavaFX
 supports. GeoTools and JTS are automatic modules, so `core` also requires the JDK modules GeoTools uses,

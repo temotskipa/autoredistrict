@@ -17,7 +17,7 @@ final class Grids {
      */
     static final InitialMap BFS_VORONOI = (g, k, rng) -> {
         int n = g.size();
-        int[] a = new int[n];
+        var a = new int[n];
         Arrays.fill(a, -1);
         ArrayDeque<Integer> q = new ArrayDeque<>();
         int placed = 0;
@@ -49,16 +49,16 @@ final class Grids {
      */
     static Graph lattice(int w, int h, int pop, IntToDoubleFunction demShare) {
         int n = w * h;
-        int[] p = new int[n];
-        double[] dem = new double[n];
-        double[] rep = new double[n];
-        double[] x = new double[n];
-        double[] y = new double[n];
-        double[] area = new double[n];
+        var p = new int[n];
+        var dem = new double[n];
+        var rep = new double[n];
+        var x = new double[n];
+        var y = new double[n];
+        var area = new double[n];
         int edges = (w - 1) * h + w * (h - 1);
-        int[] ea = new int[edges];
-        int[] eb = new int[edges];
-        double[] el = new double[edges];
+        var ea = new int[edges];
+        var eb = new int[edges];
+        var el = new double[edges];
         int m = 0;
         for (int r = 0; r < h; r++) {
             for (int c = 0; c < w; c++) {
@@ -100,7 +100,7 @@ final class Grids {
         if (size == 0) {
             return true;
         }
-        boolean[] seen = new boolean[g.size()];
+        var seen = new boolean[g.size()];
         ArrayDeque<Integer> q = new ArrayDeque<>(List.of(start));
         seen[start] = true;
         int reached = 1;

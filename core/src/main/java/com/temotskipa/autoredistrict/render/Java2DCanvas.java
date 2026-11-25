@@ -55,7 +55,7 @@ public final class Java2DCanvas implements Canvas2D {
     
     @Override
     public void text(String s, double x, double y, int argb, double size, boolean bold, boolean centered, boolean halo) {
-        Font font = new Font(Font.SANS_SERIF, bold ? Font.BOLD : Font.PLAIN, (int) Math.round(size));
+        var font = new Font(Font.SANS_SERIF, bold ? Font.BOLD : Font.PLAIN, (int) Math.round(size));
         g.setFont(font);
         FontMetrics fm = g.getFontMetrics();
         Rectangle2D bounds = fm.getStringBounds(s, g);

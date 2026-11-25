@@ -25,10 +25,10 @@ public final class Chain {
     public static ChainResult run(Graph g, Target target, Schedule schedule, InitialMap initial, MoveKernel kernel, long seed, int chainIndex, Listener listener) {
         long start = System.nanoTime();
         long deadline = schedule.timeBudget() == null ? Long.MAX_VALUE : start + schedule.timeBudget().toNanos();
-        SplittableRandom rng = new SplittableRandom(seed);
+        var rng = new SplittableRandom(seed);
         int k = target.districts();
         int[] init = initial.assign(g, k, rng.split());
-        Districting d = new Districting(g, k, init, target.populationTolerance());
+        var d = new Districting(g, k, init, target.populationTolerance());
         d.setTarget(target.demSeats(), target.minMarginPoints());
         var stats = new Stats();
         List<PhaseStats> phaseStats = new ArrayList<>();
@@ -98,7 +98,7 @@ public final class Chain {
     static double calibrate(Districting d, SplittableRandom rng, Phase ph, MoveKernel kernel) {
         Weights w = ph.weights();
         d.setWeights(new Weights(0, w.compactness(), w.tension(), w.election()));
-        double[] ups = new double[CALIBRATION_SAMPLES];
+        var ups = new double[CALIBRATION_SAMPLES];
         int m = 0;
         for (int i = 0; i < 2 * CALIBRATION_SAMPLES && m < ups.length; i++) {
             double delta = kernel.sampleDelta(d, rng, ph.selectionBias());

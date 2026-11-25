@@ -53,7 +53,7 @@ public final class StateImporter {
         Connectivity.Repair repair = Connectivity.connect(projected, adj.a(), adj.b());
         
         int m = adj.edgeCount() + repair.bridges().size();
-        TractCache.Edges edges = new TractCache.Edges(new int[m], new int[m], new double[m], new boolean[m]);
+        var edges = new TractCache.Edges(new int[m], new int[m], new double[m], new boolean[m]);
         for (int e = 0; e < adj.edgeCount(); e++) {
             edges.a()[e] = adj.a()[e];
             edges.b()[e] = adj.b()[e];
@@ -69,7 +69,7 @@ public final class StateImporter {
             bridgeInfo.add(new Manifest.BridgeInfo(layer.geoids().get(b.a()), layer.geoids().get(b.b()), Math.round(b.gapMetres() * 10) / 10.0));
         }
         
-        TractCache.Tracts tracts = new TractCache.Tracts(layer.geoids().toArray(String[]::new), layer.names().toArray(String[]::new), layer.pop().clone(), new double[n], new double[n], new double[n], adj.perimeter(), adj.outer());
+        var tracts = new TractCache.Tracts(layer.geoids().toArray(String[]::new), layer.names().toArray(String[]::new), layer.pop().clone(), new double[n], new double[n], new double[n], adj.perimeter(), adj.outer());
         for (int i = 0; i < n; i++) {
             Geometry g = projected.get(i);
             tracts.area()[i] = g.getArea();
@@ -107,15 +107,15 @@ public final class StateImporter {
             voteInfo = new Manifest.VoteInfo("2024", votes2024Zip.getFileName().toString(), Json.sha256(votes2024Zip), votes.dem(), votes.rep(), votes.demShare(), votes.blocks(), votes.blocksOutside(), missing, null, warn);
         }
         
-        Manifest.ProjectionInfo pinfo = new Manifest.ProjectionInfo(proj.standardParallel1(), proj.standardParallel2(), proj.latitudeOfCenter(), proj.longitudeOfCenter(), proj.geographicWkt(), proj.wkt());
-        Map<String, Manifest.VoteInfo> voteMap = new java.util.TreeMap<>();
+        var pinfo = new Manifest.ProjectionInfo(proj.standardParallel1(), proj.standardParallel2(), proj.latitudeOfCenter(), proj.longitudeOfCenter(), proj.geographicWkt(), proj.wkt());
+        Map<String, Manifest.VoteInfo> voteMap = new TreeMap<>();
         if (voteInfo != null) {
             voteMap.put("2024", voteInfo);
         }
-        Manifest manifest = new Manifest(Manifest.FORMAT, s.abbr(), s.fips(), s.name(), s.seats(), "Redistricting Data Hub", List.of(inputFile(tractZip)), layer.memberFiles(), Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(), n, layer.totalPopulation(), m, adj.hashedPairs(), adj.fallbackPairs(), repair.componentsBefore(), bridgeInfo, pinfo, SIMPLIFY_METRES, voteMap, warnings);
+        var manifest = new Manifest(Manifest.FORMAT, s.abbr(), s.fips(), s.name(), s.seats(), "Redistricting Data Hub", List.of(inputFile(tractZip)), layer.memberFiles(), Instant.now().truncatedTo(ChronoUnit.SECONDS).toString(), n, layer.totalPopulation(), m, adj.hashedPairs(), adj.fallbackPairs(), repair.componentsBefore(), bridgeInfo, pinfo, SIMPLIFY_METRES, voteMap, warnings);
         TractCache.write(cacheRoot, s, manifest, tracts, edges, simplified, voteInfo == null ? null : Election.Y2024, dem, rep);
         double secs = (System.nanoTime() - t0) / 1e9;
-        return new ImportSummary(s, n, layer.totalPopulation(), m, repair.bridges().size(), repair.componentsBefore(), adj.fallbackPairs(), voteInfo == null ? "-" : "2024", voteInfo == null ? 0 : voteInfo.dem(), voteInfo == null ? 0 : voteInfo.rep(), voteInfo == null ? n : voteInfo.tractsMissing(), voteInfo == null ? 0 : voteInfo.blocksOutside(), secs, warnings, null);
+        return new ImportSummary(s, n, layer.totalPopulation(), m, repair.bridges().size(), repair.componentsBefore(), adj.fallbackPairs(), voteInfo == null ? "-" : "2024", voteInfo == null ? 0 : voteInfo.dem(), voteInfo == null ? 0 : voteInfo.rep(), voteInfo == null ? n : voteInfo.tractsMissing(), voteInfo == null ? 0 : voteInfo.blocksOutside(), secs, warnings);
     }
     
     /**
@@ -168,10 +168,10 @@ public final class StateImporter {
                 warn = warn == null ? w : warn + " " + w;
             }
             List<String> ids = List.of(t.geoid());
-            double[] dem = new double[ids.size()];
-            double[] rep = new double[ids.size()];
+            var dem = new double[ids.size()];
+            var rep = new double[ids.size()];
             fill(v, ids, dem, rep);
-            Manifest.VoteInfo info = new Manifest.VoteInfo("2020", nationalZip.getFileName().toString(), sha, v.dem(), v.rep(), v.demShare(), v.blocks(), v.blocksOutside(), v.tractsMissing(ids), v.totPop(), warn);
+            var info = new Manifest.VoteInfo("2020", nationalZip.getFileName().toString(), sha, v.dem(), v.rep(), v.demShare(), v.blocks(), v.blocksOutside(), v.tractsMissing(ids), v.totPop(), warn);
             TractCache.writeVotes(cacheRoot, s, Election.Y2020, dem, rep, info);
             out.put(s.abbr(), info);
         }
@@ -183,16 +183,16 @@ public final class StateImporter {
      * (structured concurrency, platform threads), then the national 2020 file once. Per-state
      * failures are recorded in the summary rather than stopping the others.
      */
-    public static List<ImportSummary> importAll(Path rdhDir, List<StateInfo> states, Path cacheRoot, int parallel, Consumer<String> log) throws InterruptedException {
+    public static List<ImportResult> importAll(Path rdhDir, List<StateInfo> states, Path cacheRoot, int parallel, Consumer<String> log) throws InterruptedException {
         // Each state imports once: two parallel imports of one state would race on its cache folder.
         states = List.copyOf(new LinkedHashSet<>(states));
         List<String> missing = RdhFiles.missing(rdhDir, states);
         if (!missing.isEmpty()) {
             throw new MissingFilesException(rdhDir, missing);
         }
-        Semaphore permits = new Semaphore(Math.max(1, parallel));
-        List<StructuredTaskScope.Subtask<ImportSummary>> tasks = new ArrayList<>();
-        try (var scope = StructuredTaskScope.open(StructuredTaskScope.Joiner.<ImportSummary>allUntil(_ -> false), cfg -> cfg.withThreadFactory(Thread.ofPlatform().name("import-", 0).factory()))) {
+        var permits = new Semaphore(Math.max(1, parallel));
+        List<StructuredTaskScope.Subtask<ImportResult>> tasks = new ArrayList<>();
+        try (var scope = StructuredTaskScope.open(StructuredTaskScope.Joiner.<ImportResult>allUntil(_ -> false), cfg -> cfg.withThreadFactory(Thread.ofPlatform().name("import-", 0).factory()))) {
             for (StateInfo s : states) {
                 tasks.add(scope.fork(() -> {
                     permits.acquire();
@@ -204,7 +204,7 @@ public final class StateImporter {
                         return sum;
                     } catch (RuntimeException e) {
                         log.accept("FAILED " + s.abbr() + ": " + e.getMessage());
-                        return new ImportSummary(s, 0, 0, 0, 0, 0, 0, "-", 0, 0, 0, 0, (System.nanoTime() - t0) / 1e9, List.of(), e.toString());
+                        return new ImportFailure(s, (System.nanoTime() - t0) / 1e9, e.toString());
                     } finally {
                         permits.release();
                     }
@@ -212,31 +212,33 @@ public final class StateImporter {
             }
             scope.join();
         }
-        List<ImportSummary> results = new ArrayList<>();
+        List<ImportResult> results = new ArrayList<>();
         for (var t : tasks) {
             results.add(t.get());
         }
-        List<StateInfo> imported = results.stream().filter(ImportSummary::ok).map(ImportSummary::state).toList();
+        List<StateInfo> imported = results.stream().filter(ImportResult::ok).map(ImportResult::state).toList();
         if (!imported.isEmpty()) {
             long t0 = System.nanoTime();
             Map<String, Manifest.VoteInfo> v2020 = import2020(RdhFiles.national2020(rdhDir), imported, cacheRoot);
             log.accept(String.format(Locale.ROOT, "summed %s for %d states in %.1f s", RdhFiles.NATIONAL_2020, v2020.size(), (System.nanoTime() - t0) / 1e9));
             for (int i = 0; i < results.size(); i++) {
-                ImportSummary r = results.get(i);
-                Manifest.VoteInfo v = v2020.get(r.state().abbr());
-                if (r.ok() && r.defaultElection().equals("-") && v != null) {
+                if (!(results.get(i) instanceof ImportSummary(var state, var tracts, var population, var edges, var bridges, var components, var fallbackPairs, var election, var dem, var rep, var withoutVotes, var blocksOutside, var seconds, var warnings))) {
+                    continue;
+                }
+                Manifest.VoteInfo v = v2020.get(state.abbr());
+                if (election.equals("-") && v != null) {
                     // No 2024 file (California): runs fall back to 2020 by default.
-                    List<String> w = new ArrayList<>(r.warnings());
+                    List<String> w = new ArrayList<>(warnings);
                     if (v.warning() != null) {
                         w.add(v.warning());
                     }
-                    results.set(i, new ImportSummary(r.state(), r.tracts(), r.population(), r.edges(), r.bridges(), r.componentsBefore(), r.fallbackPairs(), "2020 (fallback)", v.dem(), v.rep(), v.tractsMissing(), v.blocksOutside(), r.seconds(), w, null));
+                    results.set(i, new ImportSummary(state, tracts, population, edges, bridges, components, fallbackPairs, "2020 (fallback)", v.dem(), v.rep(), v.tractsMissing(), v.blocksOutside(), seconds, w));
                 }
-                else if (r.ok() && v != null && v.warning() != null) {
+                else if (v != null && v.warning() != null) {
                     // 2020 file problems (TOT_POP mismatches) are warnings for every state.
-                    List<String> w = new ArrayList<>(r.warnings());
+                    List<String> w = new ArrayList<>(warnings);
                     w.add("2020 votes: " + v.warning());
-                    results.set(i, new ImportSummary(r.state(), r.tracts(), r.population(), r.edges(), r.bridges(), r.componentsBefore(), r.fallbackPairs(), r.defaultElection(), r.dem(), r.rep(), r.tractsWithoutVotes(), r.blocksOutside(), r.seconds(), w, null));
+                    results.set(i, new ImportSummary(state, tracts, population, edges, bridges, components, fallbackPairs, election, dem, rep, withoutVotes, blocksOutside, seconds, w));
                 }
             }
         }
@@ -287,17 +289,31 @@ public final class StateImporter {
     }
     
     /**
-     * One line of the import summary table.
+     * How one state's import ended: its summary, or why it failed.
      */
-    public record ImportSummary(StateInfo state, int tracts, long population, int edges, int bridges, int componentsBefore, int fallbackPairs, String defaultElection, double dem, double rep, long tractsWithoutVotes, long blocksOutside, double seconds, List<String> warnings, String error) {
+    public sealed interface ImportResult permits ImportSummary, ImportFailure {
         
-        public boolean ok() {
-            return error == null;
+        StateInfo state();
+        
+        default boolean ok() {
+            return this instanceof ImportSummary;
         }
+    }
+    
+    /**
+     * A state that imported: one line of the import summary table.
+     */
+    public record ImportSummary(StateInfo state, int tracts, long population, int edges, int bridges, int componentsBefore, int fallbackPairs, String defaultElection, double dem, double rep, long tractsWithoutVotes, long blocksOutside, double seconds, List<String> warnings) implements ImportResult {
         
         public double demShare() {
             return dem + rep > 0 ? dem / (dem + rep) : 0.5;
         }
+    }
+    
+    /**
+     * A state whose import failed after {@code seconds}, with the error.
+     */
+    public record ImportFailure(StateInfo state, double seconds, String error) implements ImportResult {
     }
     
     /**

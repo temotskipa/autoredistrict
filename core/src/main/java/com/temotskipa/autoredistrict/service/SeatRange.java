@@ -54,12 +54,19 @@ public final class SeatRange {
      */
     public static String table(String state, int k, List<Row> rows) {
         List<Row> sorted = new ArrayList<>(rows);
-        sorted.sort(java.util.Comparator.comparingInt(Row::requested));
-        StringBuilder sb = new StringBuilder();
-        sb.append("| ").append(state).append(" requested D | won D–R | hit | closest margin (pts) | max dev % " + "| contiguous | PASS | vote data | seeds | runtime s | flips/s |\n");
-        sb.append("|---:|---|---|---:|---:|---|---|---|---:|---:|---:|\n");
+        sorted.sort(Comparator.comparingInt(Row::requested));
+        var sb = new StringBuilder(String.format(Locale.ROOT, """
+                                                              | %s requested D | won D–R | hit | closest margin (pts) | max dev %% | contiguous | PASS | vote data \
+                                                              | seeds | runtime s | flips/s |
+                                                              |---:|---|---|---:|---:|---|---|---|---:|---:|---:|
+                                                              """, state));
         for (Row r : sorted) {
-            sb.append(String.format(Locale.ROOT, "| %d | %d–%d | %s | %.2f | %.3f | %s | %s | %s | %d | %.1f | %,.0f |%n", r.requested(), r.demWon(), r.repWon(), r.counts() ? "yes" : (r.hit() ? "hit, not PASS" : "no"), r.closestMargin(), r.maxDeviation() * 100, r.contiguous() ? "yes" : "NO", r.pass() ? "PASS" : "FAIL", r.voteData(), r.seeds(), r.seconds(), r.flipsPerSecond()));
+            String hit = switch (r.verdict()) {
+                case COUNTS -> "yes";
+                case HIT_NOT_PASS -> "hit, not PASS";
+                case MISS -> "no";
+            };
+            sb.append(String.format(Locale.ROOT, "| %d | %d–%d | %s | %.2f | %.3f | %s | %s | %s | %d | %.1f | %,.0f |%n", r.requested(), r.demWon(), r.repWon(), hit, r.closestMargin(), r.maxDeviation() * 100, r.contiguous() ? "yes" : "NO", r.pass() ? "PASS" : "FAIL", r.voteData(), r.seeds(), r.seconds(), r.flipsPerSecond()));
         }
         Set<Integer> hits = distinctHits(rows);
         sb.append(String.format(Locale.ROOT, "%n%s (%d seats): %d distinct D seat counts hit: %s%n", state, k, hits.size(), hits));
@@ -75,15 +82,37 @@ public final class SeatRange {
     }
     
     /**
+     * What one request achieved.
+     */
+    public enum Verdict {
+        /**
+         * The requested seats, from a plan that meets the PASS rules.
+         */
+        COUNTS,
+        /**
+         * The requested seats, but the plan breaks a PASS rule.
+         */
+        HIT_NOT_PASS,
+        /**
+         * Not the requested seats.
+         */
+        MISS
+    }
+    
+    /**
      * One request of a seat range. A value object.
      */
     public value record Row(int requested, int demWon, int repWon, boolean hit, double closestMargin, double maxDeviation, boolean contiguous, boolean pass, String voteData, int seeds, double seconds, double flipsPerSecond) {
+        
+        public Verdict verdict() {
+            return !hit ? Verdict.MISS : pass ? Verdict.COUNTS : Verdict.HIT_NOT_PASS;
+        }
         
         /**
          * A hit that also meets the PASS rules.
          */
         public boolean counts() {
-            return hit && pass;
+            return verdict() == Verdict.COUNTS;
         }
     }
 }

@@ -3,10 +3,7 @@ package com.temotskipa.autoredistrict.data;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Presidential votes from RDH block files, summed to tracts by the first 11 characters of the
@@ -31,8 +28,8 @@ public final class BlockVotes {
      * Reads a 2024 per-state block CSV. Blocks outside {@code tracts} are counted, not summed.
      */
     public static TractVotes read2024(InputStream csv, String source, String stateFips, Set<String> tracts) {
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(csv, StandardCharsets.UTF_8), 1 << 16)) {
-            List<String> header = Csv.header(reader, source);
+        try (var reader = new BufferedReader(new InputStreamReader(csv, StandardCharsets.UTF_8), 1 << 16)) {
+            var header = Csv.header(reader, source);
             int geoid = Csv.indexOf(header, "GEOID20");
             int dem = Csv.indexOf(header, "G24PREDHAR");
             int rep = Csv.indexOf(header, "G24PRERTRU");
@@ -76,12 +73,12 @@ public final class BlockVotes {
     private static Map<String, TractVotes> sum(BufferedReader reader, String source, Election election, int geoidCol, int demCol, int repCol, int popCol, String onlyFips, Map<String, Set<String>> tractsByFips, Set<String> onlyTracts) throws IOException {
         int[] cols = popCol >= 0 ? new int[]{geoidCol, demCol, repCol, popCol} : new int[]{geoidCol, demCol, repCol};
         int[] order = cols.clone();
-        java.util.Arrays.sort(order);
-        int[] pos = new int[cols.length];
+        Arrays.sort(order);
+        var pos = new int[cols.length];
         for (int i = 0; i < cols.length; i++) {
-            pos[i] = java.util.Arrays.binarySearch(order, cols[i]);
+            pos[i] = Arrays.binarySearch(order, cols[i]);
         }
-        String[] picked = new String[cols.length];
+        var picked = new String[cols.length];
         Map<String, Acc> accs = new HashMap<>();
         String line;
         long row = 1;

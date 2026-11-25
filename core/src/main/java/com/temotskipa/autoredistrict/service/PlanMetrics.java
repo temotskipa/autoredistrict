@@ -18,12 +18,12 @@ public record PlanMetrics(int districts, List<DistrictResult> rows, double maxDe
         Graph g = ds.graph();
         int n = g.size();
         boolean assignedOnce = assignment.length == n;
-        long[] pop = new long[k];
-        double[] dem = new double[k];
-        double[] rep = new double[k];
-        double[] area = new double[k];
-        double[] perim = new double[k];
-        int[] tracts = new int[k];
+        var pop = new long[k];
+        var dem = new double[k];
+        var rep = new double[k];
+        var area = new double[k];
+        var perim = new double[k];
+        var tracts = new int[k];
         TractCache.Tracts t = ds.tracts();
         for (int i = 0; i < Math.min(n, assignment.length); i++) {
             int d = assignment[i];
@@ -81,8 +81,8 @@ public record PlanMetrics(int districts, List<DistrictResult> rows, double maxDe
      */
     static boolean[] contiguity(Graph g, int[] assignment, int k) {
         int n = g.size();
-        boolean[] seen = new boolean[n];
-        int[] components = new int[k];
+        var seen = new boolean[n];
+        var components = new int[k];
         ArrayDeque<Integer> q = new ArrayDeque<>();
         for (int s = 0; s < n; s++) {
             if (seen[s]) {
@@ -102,7 +102,7 @@ public record PlanMetrics(int districts, List<DistrictResult> rows, double maxDe
                 }
             }
         }
-        boolean[] ok = new boolean[k];
+        var ok = new boolean[k];
         for (int d = 0; d < k; d++) {
             ok[d] = components[d] == 1;
         }
@@ -117,7 +117,7 @@ public record PlanMetrics(int districts, List<DistrictResult> rows, double maxDe
     }
     
     public double[] demShares() {
-        double[] s = new double[rows.size()];
+        var s = new double[rows.size()];
         for (int d = 0; d < s.length; d++) {
             s[d] = rows.get(d).demShare();
         }

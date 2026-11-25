@@ -1,9 +1,7 @@
 package com.temotskipa.autoredistrict.service;
 
 import com.temotskipa.autoredistrict.data.BlockVotes.Election;
-import com.temotskipa.autoredistrict.data.StateDataset;
-import com.temotskipa.autoredistrict.data.StateInfo;
-import com.temotskipa.autoredistrict.data.States;
+import com.temotskipa.autoredistrict.data.*;
 import com.temotskipa.autoredistrict.engine.Graph;
 import com.temotskipa.autoredistrict.engine.Progress;
 import org.junit.jupiter.api.Test;
@@ -11,9 +9,8 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.SplittableRandom;
+import java.util.*;
+import java.util.function.Function;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,7 +31,7 @@ class PlanServiceTest {
         for (int k : new int[]{2, 5, 13}) {
             int[] a = GraphVoronoi.INSTANCE.assign(g, k, new SplittableRandom(k));
             boolean[] ok = PlanMetrics.contiguity(g, a, k);
-            int[] sizes = new int[k];
+            var sizes = new int[k];
             for (int d : a) {
                 sizes[d]++;
             }
@@ -58,7 +55,7 @@ class PlanServiceTest {
         assertEquals(0, r.seeds());
         assertEquals(0, r.proposals());
         assertEquals(1, r.metrics().districts());
-        assertTrue(java.util.Arrays.stream(r.assignment()).allMatch(d -> d == 0));
+        assertTrue(Arrays.stream(r.assignment()).allMatch(d -> d == 0));
         assertEquals(36_000, r.metrics().population());
         assertTrue(r.pass());
         assertEquals(1, r.demRequested(), "D share 0.6 rounds to the single seat");
@@ -76,7 +73,7 @@ class PlanServiceTest {
         assertThrows(IllegalArgumentException.class, () -> o.withScale(-1));
         assertEquals(3.0, o.withScale(3.0).scheduleScale());
     }
-
+    
     @Test
     void proportionalDefaultIsRoundedAndClamped() {
         assertEquals(7, PlanOptions.proportional(0.4837, 14)); // NC 2024: 6.77
@@ -92,7 +89,7 @@ class PlanServiceTest {
     void runsATwoDistrictStateToAPassingPlanAndWritesArtifacts() throws Exception {
         StateInfo me = States.require("ME");
         SyntheticState.write(tmp, me, 12, 10);
-        PlanService svc = new PlanService(tmp);
+        var svc = new PlanService(tmp);
         StateDataset ds = svc.load(me, Election.Y2024);
         PlanResult r = svc.run(ds, fast(1), Progress.Listener.NONE);
         assertTrue(r.pass(), "max dev " + r.metrics().maxDeviation());
@@ -104,29 +101,29 @@ class PlanServiceTest {
         }
         assertTrue(Files.readString(tmp.resolve("out/me.geojson")).contains("\"FeatureCollection\""));
     }
-
+    
     @Test
     void reportBatchAndSeatRangeJudgePassWithTheRequestTolerance() throws Exception {
         StateInfo me = States.require("ME");
         // 225 equal tracts can't split evenly in two: the best plan is about 0.44% off, inside 1%.
         SyntheticState.write(tmp, me, 15, 15);
-        PlanService svc = new PlanService(tmp);
+        var svc = new PlanService(tmp);
         StateDataset ds = svc.load(me, Election.Y2024);
         PlanResult r = svc.run(ds, fast(1), Progress.Listener.NONE);
         assertTrue(r.pass());
         assertTrue(r.metrics().maxDeviation() > 1e-6);
         // The same plan from a request with a 0.0001% tolerance: every view must call it a FAIL.
-        PlanResult strict = new PlanResult(r.state(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), 1e-6, r.voteData(), r.statewideDemShare(), r.metrics(), r.assignment(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.atLarge(), r.timedOut(), r.warnings());
+        var strict = new PlanResult(r.state(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), 1e-6, r.voteData(), r.statewideDemShare(), r.metrics(), r.assignment(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.atLarge(), r.timedOut(), r.warnings());
         assertFalse(strict.pass());
         Path report = tmp.resolve("strict.json");
         Artifacts.writeReport(strict, report);
-        var json = com.temotskipa.autoredistrict.data.Json.mapper().readTree(Files.readString(report));
+        var json = Json.mapper().readTree(Files.readString(report));
         assertFalse(json.get("pass").asBoolean());
         assertEquals(1e-4, json.get("tolerancePct").asDouble(), 1e-12, "the report states the tolerance it used");
         assertFalse(BatchRunner.row(strict).pass());
         assertFalse(SeatRange.rowOf(strict).pass());
     }
-
+    
     @Test
     void seatRangeStepsOutwardAndStopsEachDirectionAtTheFirstMiss() throws InterruptedException {
         List<Integer> asked = new ArrayList<>();
@@ -136,7 +133,7 @@ class PlanServiceTest {
             return new SeatRange.Row(n, hit ? n : n - 1, 0, hit, 2.0, 0.005, true, true, "2024", 4, 1.0, 1e6);
         });
         assertEquals(List.of(5, 6, 7, 8, 4, 3, 2), asked);
-        assertEquals(java.util.Set.of(3, 4, 5, 6, 7), SeatRange.distinctHits(rows));
+        assertEquals(Set.of(3, 4, 5, 6, 7), SeatRange.distinctHits(rows));
         // A hit that fails PASS doesn't count and stops the direction.
         List<Integer> asked2 = new ArrayList<>();
         SeatRange.run(4, 2, n -> {
@@ -166,9 +163,10 @@ class PlanServiceTest {
         List<String> log = new ArrayList<>();
         BatchRunner.Summary s = BatchRunner.run(new PlanService(tmp), List.of(me, vt, States.require("NH")), fast(null), Election.Y2024, out, log::add);
         assertEquals(3, s.rows().size());
-        assertEquals("PASS", s.rows().get(0).status());
-        assertEquals("PASS", s.rows().get(1).status());
-        assertEquals("ERROR", s.rows().get(2).status(), "NH isn't in the cache");
+        assertEquals(new BatchRunner.Passed(), s.rows().get(0).outcome());
+        assertEquals(new BatchRunner.Passed(), s.rows().get(1).outcome());
+        assertInstanceOf(BatchRunner.Errored.class, s.rows().get(2).outcome(), "NH isn't in the cache");
+        assertTrue(s.rows().get(2).status().startsWith("ERROR: "), s.rows().get(2).status());
         assertEquals(2, s.passCount());
         assertEquals(3, s.totalSeats());
         assertEquals(3, log.size(), log.toString());
@@ -179,7 +177,24 @@ class PlanServiceTest {
         assertTrue(Files.size(out.resolve("contact-sheet.png")) > 0);
         assertTrue(Files.readString(out.resolve("summary.csv")).startsWith("state,fips,seats"));
         assertTrue(Files.exists(out.resolve("states/me.png")));
-        BatchRunner.Row slow = new BatchRunner.Row("XX", "99", 2, 10, 10, 0.1, true, true, true, 1, 1, 1, true, 3, 1, BatchRunner.STATE_LIMIT_SECONDS + 1, "2024", "PASS", null);
+        var slow = new BatchRunner.Row("XX", "99", 2, 10, 10, 0.1, true, true, true, 1, 1, 1, true, 3, 1, BatchRunner.STATE_LIMIT_SECONDS + 1, "2024", new BatchRunner.Passed());
         assertNotNull(new BatchRunner.Summary(List.of(slow), 1, 2).slowest());
+    }
+    
+    @Test
+    void outcomesAndVerdictsReadAsTheReportsShowThem() {
+        Function<BatchRunner.Outcome, String> status = o -> new BatchRunner.Row("XX", "99", 2, 10, 10, 0.1, true, true, true, 1, 1, 1, true, 3, 1, 1, "2024", o).status();
+        assertEquals("PASS", status.apply(new BatchRunner.Passed()));
+        assertEquals("FAIL (deviation, time)", status.apply(new BatchRunner.Failed(List.of("deviation", "time"))));
+        assertEquals("FAIL", status.apply(new BatchRunner.Failed(List.of())));
+        assertEquals("ERROR: not in the cache", status.apply(new BatchRunner.Errored("not in the cache")));
+        
+        String table = ImportService.summaryTable(List.of(new StateImporter.ImportFailure(States.require("VT"), 1.5, "bad zip")));
+        assertTrue(table.contains("| VT | 50 | | | | | | | | | | | | | 1.5 | FAILED: bad zip |"), table);
+        assertTrue(table.contains("| 0 states |"), table);
+        
+        assertEquals(SeatRange.Verdict.COUNTS, new SeatRange.Row(1, 1, 1, true, 3, 0.001, true, true, "2024", 1, 1, 1).verdict());
+        assertEquals(SeatRange.Verdict.HIT_NOT_PASS, new SeatRange.Row(1, 1, 1, true, 3, 0.5, true, false, "2024", 1, 1, 1).verdict());
+        assertEquals(SeatRange.Verdict.MISS, new SeatRange.Row(1, 0, 2, false, 3, 0.001, true, true, "2024", 1, 1, 1).verdict());
     }
 }

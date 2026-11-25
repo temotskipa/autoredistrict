@@ -5,6 +5,7 @@ import com.temotskipa.autoredistrict.data.StateDataset;
 import com.temotskipa.autoredistrict.render.Exporters;
 import com.temotskipa.autoredistrict.render.MapData;
 import com.temotskipa.autoredistrict.render.MapRenderer;
+import org.locationtech.jts.geom.Envelope;
 
 import java.awt.image.BufferedImage;
 import java.io.IOException;
@@ -37,7 +38,7 @@ public final class Artifacts {
      * Tracts with no people.
      */
     public static boolean[] emptyTracts(StateDataset ds) {
-        boolean[] e = new boolean[ds.size()];
+        var e = new boolean[ds.size()];
         for (int i = 0; i < e.length; i++) {
             e[i] = ds.tracts().pop()[i] == 0;
         }
@@ -47,8 +48,8 @@ public final class Artifacts {
     /**
      * Extent of the tracts with people in them.
      */
-    public static org.locationtech.jts.geom.Envelope populatedExtent(StateDataset ds) {
-        org.locationtech.jts.geom.Envelope e = new org.locationtech.jts.geom.Envelope();
+    public static Envelope populatedExtent(StateDataset ds) {
+        var e = new Envelope();
         for (int i = 0; i < ds.size(); i++) {
             if (ds.tracts().pop()[i] > 0) {
                 e.expandToInclude(ds.geometry().get(i).getEnvelopeInternal());
@@ -108,7 +109,7 @@ public final class Artifacts {
     
     public static void writeReport(PlanResult r, Path file) {
         PlanMetrics m = r.metrics();
-        Report rep = new Report(r.state().abbr(), r.state().fips(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), r.voteData(), r.statewideDemShare(), m.demWon(), m.repWon(), r.hit(), r.pass(), r.tolerance() * 100, m.maxDeviation() * 100, m.allContiguous(), m.assignedOnce(), m.populationMatches(), m.population(), m.importedPopulation(), m.closestMargin(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.warnings(), m.rows());
+        var rep = new Report(r.state().abbr(), r.state().fips(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), r.voteData(), r.statewideDemShare(), m.demWon(), m.repWon(), r.hit(), r.pass(), r.tolerance() * 100, m.maxDeviation() * 100, m.allContiguous(), m.assignedOnce(), m.populationMatches(), m.population(), m.importedPopulation(), m.closestMargin(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.warnings(), m.rows());
         try {
             Files.createDirectories(file.toAbsolutePath().getParent());
             try (OutputStream out = Files.newOutputStream(file)) {
@@ -123,9 +124,10 @@ public final class Artifacts {
      * Text table of districts for the console.
      */
     public static String districtTable(PlanResult r) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("| district | population | deviation % | D share | winner | margin (pts) | tracts | Polsby-Popper |\n");
-        sb.append("|---:|---:|---:|---:|---|---:|---:|---:|\n");
+        var sb = new StringBuilder("""
+                                   | district | population | deviation % | D share | winner | margin (pts) | tracts | Polsby-Popper |
+                                   |---:|---:|---:|---:|---|---:|---:|---:|
+                                   """);
         for (DistrictResult d : r.metrics().rows()) {
             sb.append(String.format(Locale.ROOT, "| %d | %,d | %+.3f | %.4f | %s | %+.2f | %d | %.3f |%n", d.district(), d.population(), d.deviation() * 100, d.demShare(), d.winner(), d.margin(), d.tracts(), d.polsbyPopper()));
         }

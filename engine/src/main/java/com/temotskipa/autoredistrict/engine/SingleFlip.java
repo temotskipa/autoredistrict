@@ -10,12 +10,12 @@ import java.util.SplittableRandom;
  * Metropolis test of its own on the whole move's score change.
  */
 public final class SingleFlip implements MoveKernel {
-
+    
     public static final SingleFlip INSTANCE = new SingleFlip();
-
+    
     private SingleFlip() {
     }
-
+    
     @Override
     public boolean step(Districting d, SplittableRandom rng, double t, double selectionBias, Stats stats) {
         int u = d.pickBoundary(rng, selectionBias);
@@ -26,7 +26,7 @@ public final class SingleFlip implements MoveKernel {
         stats.proposals++;
         return tryFlip(d, u, b, t, rng, stats);
     }
-
+    
     /**
      * Proposes moving {@code u} to district {@code b} and applies it if accepted.
      */
@@ -52,7 +52,7 @@ public final class SingleFlip implements MoveKernel {
         }
         return false;
     }
-
+    
     @Override
     public double sampleDelta(Districting d, SplittableRandom rng, double selectionBias) {
         int u = d.pickBoundary(rng, selectionBias);

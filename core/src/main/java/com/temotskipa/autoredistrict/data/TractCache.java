@@ -134,7 +134,7 @@ public final class TractCache {
             throw new UncheckedIOException("Could not read " + file, e);
         }
         int n = rows.size();
-        Tracts t = new Tracts(new String[n], new String[n], new int[n], new double[n], new double[n], new double[n], new double[n], new double[n]);
+        var t = new Tracts(new String[n], new String[n], new int[n], new double[n], new double[n], new double[n], new double[n], new double[n]);
         for (int i = 0; i < n; i++) {
             String[] f = rows.get(i);
             t.geoid()[i] = f[0];
@@ -173,7 +173,7 @@ public final class TractCache {
             throw new UncheckedIOException("Could not read " + file, e);
         }
         int m = rows.size();
-        Edges e = new Edges(new int[m], new int[m], new double[m], new boolean[m]);
+        var e = new Edges(new int[m], new int[m], new double[m], new boolean[m]);
         for (int i = 0; i < m; i++) {
             String[] f = rows.get(i);
             e.a()[i] = Integer.parseInt(f[0]);
@@ -185,7 +185,7 @@ public final class TractCache {
     }
     
     private static void writeGeometry(Path file, List<Geometry> geoms) throws IOException {
-        WKBWriter writer = new WKBWriter(2);
+        var writer = new WKBWriter(2);
         try (DataOutputStream out = new DataOutputStream(new BufferedOutputStream(Files.newOutputStream(file), 1 << 16))) {
             out.writeInt(GEOMETRY_MAGIC);
             out.writeInt(geoms.size());
@@ -202,7 +202,7 @@ public final class TractCache {
      */
     public static List<Geometry> readGeometry(Path dir) {
         Path file = dir.resolve("geometry.bin");
-        WKBReader reader = new WKBReader(new GeometryFactory());
+        var reader = new WKBReader(new GeometryFactory());
         try (DataInputStream in = new DataInputStream(new BufferedInputStream(Files.newInputStream(file), 1 << 16))) {
             if (in.readInt() != GEOMETRY_MAGIC) {
                 throw new DataException(file + " isn't an autoredistrict geometry file; re-import the state.");
@@ -210,7 +210,7 @@ public final class TractCache {
             int n = in.readInt();
             List<Geometry> out = new ArrayList<>(n);
             for (int i = 0; i < n; i++) {
-                byte[] wkb = new byte[in.readInt()];
+                var wkb = new byte[in.readInt()];
                 in.readFully(wkb);
                 out.add(reader.read(wkb));
             }
@@ -239,8 +239,8 @@ public final class TractCache {
         if (!Files.isRegularFile(file)) {
             return null;
         }
-        double[] dem = new double[geoids.length];
-        double[] rep = new double[geoids.length];
+        var dem = new double[geoids.length];
+        var rep = new double[geoids.length];
         try (BufferedReader r = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             Csv.header(r, file.toString());
             String line;

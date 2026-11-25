@@ -25,11 +25,11 @@ public final class GraphVoronoi implements InitialMap {
         if (k > n) {
             throw new IllegalArgumentException(k + " districts for " + n + " tracts");
         }
-        int[] owner = new int[n];
+        var owner = new int[n];
         Arrays.fill(owner, -1);
-        double[] dist = new double[n];
+        var dist = new double[n];
         Arrays.fill(dist, Double.POSITIVE_INFINITY);
-        Heap heap = new Heap(Math.max(16, 2 * g.edgeCount() + k));
+        var heap = new Heap(Math.max(16, 2 * g.edgeCount() + k));
         int populated = 0;
         for (int i = 0; i < n; i++) {
             if (g.pop(i) > 0) {
@@ -47,7 +47,7 @@ public final class GraphVoronoi implements InitialMap {
             dist[s] = 0;
             heap.push(0, s);
         }
-        boolean[] done = new boolean[n];
+        var done = new boolean[n];
         while (!heap.isEmpty()) {
             double d = heap.topKey();
             int u = heap.pop();

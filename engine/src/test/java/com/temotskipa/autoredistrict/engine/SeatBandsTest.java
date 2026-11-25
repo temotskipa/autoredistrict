@@ -45,10 +45,10 @@ class SeatBandsTest {
     
     @Test
     void replaceTwoMatchesSorting() {
-        SplittableRandom rng = new SplittableRandom(1);
+        var rng = new SplittableRandom(1);
         for (int t = 0; t < 2000; t++) {
             int k = 2 + rng.nextInt(20);
-            double[] s = new double[k];
+            var s = new double[k];
             for (int i = 0; i < k; i++) {
                 s[i] = rng.nextInt(10) / 10.0; // ties on purpose
             }
@@ -61,7 +61,7 @@ class SeatBandsTest {
             expected[a] = a1;
             expected[b] = b1;
             Arrays.sort(expected);
-            double[] out = new double[k];
+            var out = new double[k];
             SeatBands.replaceTwo(s, k, s[a], s[b], a1, b1, out);
             assertArrayEquals(expected, out, 0.0);
         }

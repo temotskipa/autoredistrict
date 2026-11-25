@@ -14,11 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -36,13 +32,13 @@ public final class Main implements Runnable {
     }
     
     public static int run(String... args) {
-        CommandLine cl = new CommandLine(new Main());
-        cl.setExecutionExceptionHandler((ex, cmd, _) -> {
-            if (ex instanceof DataException || ex instanceof IllegalArgumentException) {
+        var cl = new CommandLine(new Main());
+        cl.setExecutionExceptionHandler((ex, cmd, _) -> switch (ex) {
+            case DataException _, IllegalArgumentException _ -> {
                 cmd.getErr().println("error: " + ex.getMessage());
-                return 2;
+                yield 2;
             }
-            throw ex;
+            default -> throw ex;
         });
         return cl.execute(args);
     }
@@ -79,7 +75,7 @@ public final class Main implements Runnable {
         if (quiet) {
             return Progress.Listener.NONE;
         }
-        AtomicLong last = new AtomicLong();
+        var last = new AtomicLong();
         return p -> {
             long now = System.nanoTime();
             long prev = last.get();
@@ -160,7 +156,7 @@ public final class Main implements Runnable {
         public Integer call() throws Exception {
             List<StateInfo> list = parseStates(states);
             long t0 = System.nanoTime();
-            List<StateImporter.ImportSummary> rows;
+            List<StateImporter.ImportResult> rows;
             try {
                 rows = ImportService.importFolder(rdhDir, list, parent.cacheDir, parallel, System.out::println);
             } catch (StateImporter.MissingFilesException e) {
@@ -170,9 +166,13 @@ public final class Main implements Runnable {
             }
             System.out.println();
             System.out.print(ImportService.summaryTable(rows));
-            rows.stream().filter(r -> !r.warnings().isEmpty()).forEach(r -> r.warnings().forEach(w -> System.out.println("warning " + r.state().abbr() + ": " + w)));
-            System.out.printf(Locale.ROOT, "%nImported %d of %d states in %.1f s.%n", rows.stream().filter(StateImporter.ImportSummary::ok).count(), rows.size(), (System.nanoTime() - t0) / 1e9);
-            return rows.stream().allMatch(StateImporter.ImportSummary::ok) ? 0 : 1;
+            for (StateImporter.ImportResult r : rows) {
+                if (r instanceof StateImporter.ImportSummary s) {
+                    s.warnings().forEach(w -> System.out.println("warning " + s.state().abbr() + ": " + w));
+                }
+            }
+            System.out.printf(Locale.ROOT, "%nImported %d of %d states in %.1f s.%n", rows.stream().filter(StateImporter.ImportResult::ok).count(), rows.size(), (System.nanoTime() - t0) / 1e9);
+            return rows.stream().allMatch(StateImporter.ImportResult::ok) ? 0 : 1;
         }
     }
     
@@ -200,7 +200,7 @@ public final class Main implements Runnable {
         @Override
         public Integer call() throws Exception {
             StateInfo st = States.require(state);
-            PlanService svc = new PlanService(parent.cacheDir);
+            var svc = new PlanService(parent.cacheDir);
             StateDataset ds = svc.load(st, args.election());
             PlanResult r = svc.run(ds, args.options(demSeats), consoleProgress(quiet));
             printResult(r);
@@ -269,7 +269,7 @@ public final class Main implements Runnable {
         @Override
         public Integer call() throws Exception {
             StateInfo st = States.require(state);
-            PlanService svc = new PlanService(parent.cacheDir);
+            var svc = new PlanService(parent.cacheDir);
             StateDataset ds = svc.load(st, args.election());
             int k = st.seats();
             int prop = PlanOptions.proportional(ds.demShare(), k);

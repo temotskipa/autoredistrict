@@ -3,22 +3,19 @@ package com.temotskipa.autoredistrict.data;
 import org.geotools.api.referencing.FactoryException;
 import org.geotools.api.referencing.crs.CoordinateReferenceSystem;
 import org.geotools.api.referencing.operation.MathTransform;
+import org.geotools.api.referencing.operation.NoninvertibleTransformException;
 import org.geotools.api.referencing.operation.TransformException;
 import org.geotools.geometry.jts.JTS;
 import org.geotools.referencing.CRS;
-import org.locationtech.jts.geom.Coordinate;
-import org.locationtech.jts.geom.CoordinateFilter;
-import org.locationtech.jts.geom.Envelope;
-import org.locationtech.jts.geom.Geometry;
-import org.locationtech.jts.geom.GeometryFactory;
-import org.locationtech.jts.geom.Polygon;
-import org.locationtech.jts.geom.Polygonal;
+import org.locationtech.jts.geom.*;
 import org.locationtech.jts.geom.util.AffineTransformation;
 import org.locationtech.jts.geom.util.PolygonExtracter;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * A per-state Albers equal-area conic projection with standard parallels at 1/6 and 5/6 of the
@@ -41,11 +38,11 @@ public final class AlbersProjection {
      * The projection handles them correctly (see GeometryTest), so that logger is quietened. The
      * field keeps a strong reference, since java.util.logging holds loggers weakly.
      */
-    private static final java.util.logging.Logger PROJECTION_LOG;
+    private static final Logger PROJECTION_LOG;
     
     static {
-        PROJECTION_LOG = java.util.logging.Logger.getLogger("org.geotools.referencing.operation.projection");
-        PROJECTION_LOG.setLevel(java.util.logging.Level.SEVERE);
+        PROJECTION_LOG = Logger.getLogger("org.geotools.referencing.operation.projection");
+        PROJECTION_LOG.setLevel(Level.SEVERE);
     }
     
     private final double lat1;
@@ -69,7 +66,7 @@ public final class AlbersProjection {
             CoordinateReferenceSystem target = CRS.parseWKT(wkt);
             this.forward = CRS.findMathTransform(source, target, true);
             this.inverse = forward.inverse();
-        } catch (FactoryException | org.geotools.api.referencing.operation.NoninvertibleTransformException e) {
+        } catch (FactoryException | NoninvertibleTransformException e) {
             throw new DataException("Could not build the Albers projection: " + e.getMessage(), e);
         }
     }
@@ -97,7 +94,7 @@ public final class AlbersProjection {
      * above +170 and some below -170), eastern-hemisphere longitudes are shifted by -360.
      */
     public static Envelope unwrappedBounds(Iterable<Geometry> geometries) {
-        Envelope raw = new Envelope();
+        var raw = new Envelope();
         for (Geometry g : geometries) {
             if (g != null && !g.isEmpty()) {
                 raw.expandToInclude(g.getEnvelopeInternal());
@@ -106,7 +103,7 @@ public final class AlbersProjection {
         if (raw.isNull() || !(raw.getMinX() < -170 && raw.getMaxX() > 170)) {
             return raw;
         }
-        Envelope shifted = new Envelope();
+        var shifted = new Envelope();
         for (Geometry g : geometries) {
             if (g == null) {
                 continue;
@@ -152,7 +149,7 @@ public final class AlbersProjection {
         double[] p = inverse(x, y);
         return new Coordinate(wrap(p[0]), p[1]);
     }
-
+    
     /**
      * Inverse-projects a geometry in metres to lon/lat. Longitudes stay continuous around the
      * central meridian while projecting. A polygonal geometry that then crosses the antimeridian
@@ -178,7 +175,7 @@ public final class AlbersProjection {
         copy.geometryChanged();
         return copy;
     }
-
+    
     /**
      * Splits a polygonal lon/lat geometry with continuous longitudes into the parts east and west of
      * the antimeridian, each shifted by 360 degrees as needed to lie within [-180, 180].
@@ -201,7 +198,7 @@ public final class AlbersProjection {
         }
         return f.createMultiPolygon(parts.toArray(Polygon[]::new));
     }
-
+    
     private double[] inverse(double x, double y) {
         double[] p = {x, y};
         try {
@@ -211,7 +208,7 @@ public final class AlbersProjection {
         }
         return p;
     }
-
+    
     private static double wrap(double lon) {
         while (lon < -180) {
             lon += 360;

@@ -53,7 +53,7 @@ public final class MapPainter {
      * Paints the plan; {@code labels} adds district numbers.
      */
     public static void paint(Canvas2D c, MapData data, Viewport vp, boolean labels, double labelSize) {
-        int[] color = new int[data.districts()];
+        var color = new int[data.districts()];
         for (int d = 0; d < data.districts(); d++) {
             color[d] = shareColor(data.demShare()[d]);
         }

@@ -4,7 +4,7 @@
 module com.temotskipa.autoredistrict.cli {
     requires com.temotskipa.autoredistrict.core;
     requires info.picocli;
-
+    
     // picocli sets the annotated option fields reflectively.
     opens com.temotskipa.autoredistrict.cli to info.picocli;
 }

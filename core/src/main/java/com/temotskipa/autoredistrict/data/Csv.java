@@ -19,7 +19,7 @@ public final class Csv {
      */
     public static List<String> split(String line) {
         List<String> out = new ArrayList<>();
-        StringBuilder field = new StringBuilder();
+        var field = new StringBuilder();
         boolean quoted = false;
         for (int i = 0; i < line.length(); i++) {
             char c = line.charAt(i);
@@ -65,7 +65,7 @@ public final class Csv {
             int start = i;
             String value;
             if (i < len && line.charAt(i) == '"') {
-                StringBuilder sb = new StringBuilder();
+                var sb = new StringBuilder();
                 i++;
                 while (i < len) {
                     char c = line.charAt(i);

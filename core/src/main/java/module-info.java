@@ -14,12 +14,12 @@ module com.temotskipa.autoredistrict.core {
     requires transitive tools.jackson.databind;
     // The canvas interface and the PNG exports use java.awt types.
     requires transitive java.desktop;
-
+    
     requires org.geotools.api;
     requires org.geotools.main;
     requires org.geotools.referencing;
     requires org.geotools.shapefile;
-
+    
     // GeoTools' jars are automatic modules, which declare no requires; these are the JDK modules
     // jdeps lists for them, so they are in the module graph whenever this module is.
     requires java.naming;
@@ -27,7 +27,7 @@ module com.temotskipa.autoredistrict.core {
     requires java.rmi;
     requires java.scripting;
     requires java.sql;
-
+    
     exports com.temotskipa.autoredistrict.data;
     exports com.temotskipa.autoredistrict.render;
     exports com.temotskipa.autoredistrict.service;

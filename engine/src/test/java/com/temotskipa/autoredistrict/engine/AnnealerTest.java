@@ -44,7 +44,7 @@ class AnnealerTest {
     @Test
     void parallelSeedsGiveTheSameResultAsRunningThemOneByOne() throws InterruptedException {
         Graph g = planted();
-        Target t = new Target(4, 2, 2.0, 0.02);
+        var t = new Target(4, 2, 2.0, 0.02);
         Schedule s = Grids.schedule(15_000);
         long[] seeds = Annealer.seeds(42, 4);
         List<ChainResult> parallel = Annealer.runAll(g, t, s, Grids.BFS_VORONOI, seeds, Progress.Listener.NONE);
@@ -60,7 +60,7 @@ class AnnealerTest {
     @Test
     void interruptingTheCallerCancelsTheScopeAndStopsEveryChain() throws Exception {
         Graph g = planted();
-        Schedule endless = new Schedule(List.of(new Phase("long", Long.MAX_VALUE / 4, new Weights(1, 10, 1, 1), 0.5, 1e-3, 1.0, false)), 0, Duration.ofMinutes(10));
+        var endless = new Schedule(List.of(new Phase("long", Long.MAX_VALUE / 4, new Weights(1, 10, 1, 1), 0.5, 1e-3, 1.0, false)), 0, Duration.ofMinutes(10));
         AtomicReference<Throwable> outcome = new AtomicReference<>();
         Thread caller = Thread.ofPlatform().start(() -> {
             try {
@@ -84,13 +84,13 @@ class AnnealerTest {
     @Test
     void tooManySeedsAreRefusedBeforeAnyChainThreadStarts() {
         Graph g = planted();
-        Target t = new Target(4, 2, 2.0, 0.02);
+        var t = new Target(4, 2, 2.0, 0.02);
         long[] seeds = Annealer.seeds(1, Annealer.MAX_SEEDS + 1);
         assertThrows(IllegalArgumentException.class, () -> Annealer.runAll(g, t, Grids.schedule(1_000), Grids.BFS_VORONOI, seeds, Progress.Listener.NONE));
         assertThrows(IllegalArgumentException.class, () -> Annealer.runUntil(g, t, Grids.schedule(1_000), Grids.BFS_VORONOI, seeds, Progress.Listener.NONE, _ -> true));
         assertEquals(0, chainThreads());
     }
-
+    
     @Test
     void runUntilStopsTheOtherChainsAfterAMatch() throws InterruptedException {
         Graph g = planted();
@@ -101,11 +101,11 @@ class AnnealerTest {
         assertTrue(u.proposals() >= finished, "every chain's proposals are counted: " + u.proposals() + " < " + finished);
         assertEquals(0, chainThreads());
     }
-
+    
     @Test
     void runUntilTakesTheFirstAcceptedChainInSeedOrderEveryTime() throws InterruptedException {
         Graph g = planted();
-        Target t = new Target(4, 2, 2.0, 0.02);
+        var t = new Target(4, 2, 2.0, 0.02);
         Schedule s = Grids.schedule(10_000);
         long[] seeds = Annealer.seeds(9, 6);
         // Chain 0 is refused, so chain 1 is the answer however the six chains are scheduled.

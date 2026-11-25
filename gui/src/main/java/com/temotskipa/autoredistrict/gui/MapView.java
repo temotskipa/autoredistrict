@@ -67,7 +67,7 @@ final class MapView extends Pane {
         this.tracts = tracts;
         this.tractShares = shares;
         this.plan = null;
-        Envelope env = new Envelope();
+        var env = new Envelope();
         if (focus != null && !focus.isNull()) {
             env.expandToInclude(focus);
         }
@@ -79,7 +79,7 @@ final class MapView extends Pane {
         this.bounds = env;
         fit();
     }
-
+    
     /**
      * Shows a finished plan, framed like the PNG export. Keeps the user's zoom and pan when the plan
      * has the same frame as what is on screen.
@@ -115,7 +115,7 @@ final class MapView extends Pane {
     
     private void redraw() {
         GraphicsContext g = canvas.getGraphicsContext2D();
-        FxCanvas c = new FxCanvas(g);
+        var c = new FxCanvas(g);
         c.fillRect(0, 0, canvas.getWidth(), canvas.getHeight(), MapPainter.BACKGROUND);
         if (viewport == null) {
             return;

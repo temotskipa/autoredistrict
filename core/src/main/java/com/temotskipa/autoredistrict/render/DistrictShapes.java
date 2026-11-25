@@ -27,7 +27,7 @@ public final class DistrictShapes {
         for (int i = 0; i < assignment.length; i++) {
             parts.get(assignment[i]).add(tracts.get(i));
         }
-        Geometry[] out = new Geometry[k];
+        var out = new Geometry[k];
         GeometryFactory gf = tracts.isEmpty() ? new GeometryFactory() : tracts.getFirst().getFactory();
         for (int d = 0; d < k; d++) {
             List<Geometry> p = parts.get(d);

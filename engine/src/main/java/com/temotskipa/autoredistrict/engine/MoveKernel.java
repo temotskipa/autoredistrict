@@ -29,7 +29,7 @@ public interface MoveKernel {
          * Accepted moves that carried a cut-off piece along (see Districting#tryPieceMove).
          */
         public long pieceMoves;
-
+        
         /**
          * All counters start at zero.
          */

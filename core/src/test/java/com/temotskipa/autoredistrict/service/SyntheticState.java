@@ -36,11 +36,11 @@ final class SyntheticState {
      */
     static void write(Path cache, StateInfo st, int w, int h, double shift) {
         int n = w * h;
-        GeometryFactory gf = new GeometryFactory();
-        TractCache.Tracts t = new TractCache.Tracts(new String[n], new String[n], new int[n], new double[n], new double[n], new double[n], new double[n], new double[n]);
+        var gf = new GeometryFactory();
+        var t = new TractCache.Tracts(new String[n], new String[n], new int[n], new double[n], new double[n], new double[n], new double[n], new double[n]);
         List<Geometry> geoms = new ArrayList<>();
-        double[] dem = new double[n];
-        double[] rep = new double[n];
+        var dem = new double[n];
+        var rep = new double[n];
         List<int[]> edges = new ArrayList<>();
         for (int r = 0; r < h; r++) {
             for (int c = 0; c < w; c++) {
@@ -65,7 +65,7 @@ final class SyntheticState {
                 }
             }
         }
-        TractCache.Edges e = new TractCache.Edges(new int[edges.size()], new int[edges.size()], new double[edges.size()], new boolean[edges.size()]);
+        var e = new TractCache.Edges(new int[edges.size()], new int[edges.size()], new double[edges.size()], new boolean[edges.size()]);
         for (int j = 0; j < edges.size(); j++) {
             e.a()[j] = edges.get(j)[0];
             e.b()[j] = edges.get(j)[1];
@@ -78,7 +78,7 @@ final class SyntheticState {
             d += dem[i];
             rr += rep[i];
         }
-        Manifest m = new Manifest(Manifest.FORMAT, st.abbr(), st.fips(), st.name(), st.seats(), "synthetic test", List.of(), List.of(), "2026-11-24T00:00:00Z", n, (long) n * POP_PER_TRACT, edges.size(), edges.size(), 0, 1, List.of(), new Manifest.ProjectionInfo(44, 46, 45, -69, p.geographicWkt(), p.wkt()), 25, Map.of("2024", new Manifest.VoteInfo("2024", "synthetic", "", d, rr, d / (d + rr), n, 0, 0, null, null)), List.of());
+        var m = new Manifest(Manifest.FORMAT, st.abbr(), st.fips(), st.name(), st.seats(), "synthetic test", List.of(), List.of(), "2026-11-24T00:00:00Z", n, (long) n * POP_PER_TRACT, edges.size(), edges.size(), 0, 1, List.of(), new Manifest.ProjectionInfo(44, 46, 45, -69, p.geographicWkt(), p.wkt()), 25, Map.of("2024", new Manifest.VoteInfo("2024", "synthetic", "", d, rr, d / (d + rr), n, 0, 0, null, null)), List.of());
         TractCache.write(cache, st, m, t, e, geoms, Election.Y2024, dem, rep);
     }
 }

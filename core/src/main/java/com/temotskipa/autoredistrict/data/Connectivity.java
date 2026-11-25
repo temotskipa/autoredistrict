@@ -6,6 +6,7 @@ import org.locationtech.jts.index.strtree.ItemDistance;
 import org.locationtech.jts.index.strtree.STRtree;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -22,7 +23,7 @@ public final class Connectivity {
     
     public static Repair connect(List<Geometry> projected, int[] edgeA, int[] edgeB) {
         int n = projected.size();
-        UnionFind uf = new UnionFind(n);
+        var uf = new UnionFind(n);
         for (int e = 0; e < edgeA.length; e++) {
             uf.union(edgeA[e], edgeB[e]);
         }
@@ -31,14 +32,14 @@ public final class Connectivity {
         if (before <= 1) {
             return new Repair(bridges, before);
         }
-        STRtree tree = new STRtree();
+        var tree = new STRtree();
         for (int i = 0; i < n; i++) {
             tree.insert(projected.get(i).getEnvelopeInternal(), i);
         }
         tree.build();
         while (uf.count() > 1) {
             // Group units by component root and find the largest component.
-            int[] size = new int[n];
+            var size = new int[n];
             for (int i = 0; i < n; i++) {
                 size[uf.find(i)]++;
             }
@@ -49,8 +50,8 @@ public final class Connectivity {
                 }
             }
             List<List<Integer>> comps = new ArrayList<>();
-            int[] index = new int[n];
-            java.util.Arrays.fill(index, -1);
+            var index = new int[n];
+            Arrays.fill(index, -1);
             for (int i = 0; i < n; i++) {
                 int r = uf.find(i);
                 if (r == largest) {

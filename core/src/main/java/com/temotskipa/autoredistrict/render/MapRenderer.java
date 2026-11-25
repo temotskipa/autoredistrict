@@ -24,10 +24,10 @@ public final class MapRenderer {
      * A full map with title, legend and district labels.
      */
     public static BufferedImage render(MapData data, int width, int height) {
-        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        var img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         try {
-            Java2DCanvas c = new Java2DCanvas(g);
+            var c = new Java2DCanvas(g);
             c.fillRect(0, 0, width, height, MapPainter.BACKGROUND);
             double header = 64;
             Envelope env = data.bounds();
@@ -48,10 +48,10 @@ public final class MapRenderer {
      * A thumbnail with a one-line caption and no district labels.
      */
     public static BufferedImage thumbnail(MapData data, String caption, int width, int height) {
-        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        var img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         try {
-            Java2DCanvas c = new Java2DCanvas(g);
+            var c = new Java2DCanvas(g);
             c.fillRect(0, 0, width, height, 0xFFFFFFFF);
             double captionH = 22;
             MapPainter.Viewport vp = MapPainter.Viewport.fit(data.bounds(), 0, captionH, width, height - captionH, 6);
@@ -79,10 +79,10 @@ public final class MapRenderer {
         int top = 44;
         int width = columns * tw + (columns + 1) * gap;
         int height = top + rows * th + (rows + 1) * gap;
-        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
+        var img = new BufferedImage(width, height, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         try {
-            Java2DCanvas c = new Java2DCanvas(g);
+            var c = new Java2DCanvas(g);
             c.fillRect(0, 0, width, height, 0xFFDDDDDD);
             c.text(title, gap + 4, 30, MapPainter.TEXT, 22, true, false, false);
             for (int i = 0; i < tiles.size(); i++) {

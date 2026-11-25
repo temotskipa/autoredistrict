@@ -5,6 +5,8 @@ import com.temotskipa.autoredistrict.data.BlockVotes.TractVotes;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -56,12 +58,15 @@ class BlockVotesTest {
     @Test
     void nonFiniteVoteValuesAreAnErrorNamingFileAndColumn() {
         for (String bad : new String[]{"NaN", "Infinity", "-Infinity"}) {
-            String csv = "GEOID20,G24PREDHAR,G24PRERTRU\n230010001001000," + bad + ",4.5\n";
-            DataException e = assertThrows(DataException.class, () -> BlockVotes.read2024(new java.io.ByteArrayInputStream(csv.getBytes(java.nio.charset.StandardCharsets.UTF_8)), "me.csv", "23", Set.of("23001000100")));
+            String csv = """
+                         GEOID20,G24PREDHAR,G24PRERTRU
+                         230010001001000,%s,4.5
+                         """.formatted(bad);
+            DataException e = assertThrows(DataException.class, () -> BlockVotes.read2024(new ByteArrayInputStream(csv.getBytes(StandardCharsets.UTF_8)), "me.csv", "23", Set.of("23001000100")));
             assertEquals("me.csv has a non-finite value '" + bad + "' in the D column.", e.getMessage());
         }
     }
-
+    
     @Test
     void fileWithoutPresidentialColumnsIsAnErrorNamingIt() {
         DataException e = assertThrows(DataException.class, () -> BlockVotes.read2024(Fixtures.resource("/votes/no_president.csv"), "xx_2024_gen_2020_blocks.csv", "23", Set.of()));

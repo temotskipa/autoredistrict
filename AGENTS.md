@@ -16,12 +16,12 @@ Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<proje
   tallies, contiguity, scoring, the pruning move), `SingleFlip` behind `MoveKernel`, `SeatBands`, `Chain` (phases,
   temperatures, repair), `Annealer` (parallel seeds with `StructuredTaskScope` on platform threads).
 - `core`, everything the two front ends share:
-    - package `data`: `RdhTractImporter` (GeoTools shapefile/CSV reading, GEOID padding, validation),
-      `AlbersProjection`, `AdjacencyBuilder`, `Connectivity`, `BlockVotes`, `TractCache` (`.cache/rdh/<st>/`),
-      `StateDataset`, `StateImporter`, `States` (2020 apportionment).
-    - package `service`: `PlanService` (run, at-large short cut), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS
-      checks), `SeatRange`, `BatchRunner`, `Artifacts`, `ImportService`. New features belong here, not in a front end.
-    - package `render`: `MapPainter` over `Canvas2D` (Java2D here, JavaFX in the GUI), `MapRenderer`, `Exporters`.
+	- package `data`: `RdhTractImporter` (GeoTools shapefile/CSV reading, GEOID padding, validation),
+	  `AlbersProjection`, `AdjacencyBuilder`, `Connectivity`, `BlockVotes`, `TractCache` (`.cache/rdh/<st>/`),
+	  `StateDataset`, `StateImporter`, `States` (2020 apportionment).
+	- package `service`: `PlanService` (run, at-large short cut), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS
+	  checks), `SeatRange`, `BatchRunner`, `Artifacts`, `ImportService`. New features belong here, not in a front end.
+	- package `render`: `MapPainter` over `Canvas2D` (Java2D here, JavaFX in the GUI), `MapRenderer`, `Exporters`.
 - `cli`: `Main` with `import`, `run`, `all`, `seat-range`.
 - `gui`: `Launcher` and `App`, including snapshot mode.
 
@@ -35,8 +35,17 @@ Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<proje
 - JPMS: every module has a `module-info.java`; the apps run on the module path. A new dependency needs a `requires`
   (and `opens` if it reflects on our classes, like Jackson, picocli and JavaFX). Tests have no module-info and run on
   the class path. GeoTools and JTS are automatic modules; `core` lists the JDK modules GeoTools needs.
-- Java conventions: standard Java naming, 4-space indents, no wildcard imports in new code, `value record` for small
-  immutable types, records for data carriers, primitive arrays in the engine's hot loop (no allocation per step).
+- Java conventions: standard Java naming, 4-space indents, `value record` for small immutable types, records for data
+  carriers, primitive arrays in the engine's hot loop (no allocation per step).
+- A result with alternatives is a sealed interface over records (`BatchRunner.Outcome`, `StateImporter.ImportResult`),
+  read with exhaustive `switch`es and record patterns, not status strings or nullable error fields. Prefer pattern
+  `switch` over `instanceof` chains, and text blocks for multi-line text.
+- `var` for a local whose initializer names its type (`var sb = new StringBuilder()`, `var a = new int[n]`); keep the
+  type written out in `List<String> l = new ArrayList<>()` style declarations (interface type or diamond).
+- Imports follow IntelliJ's default settings, as its Optimize Imports leaves them: `*` from five classes of one package
+  (always for `java.awt`) and from three static members, otherwise single-type imports. Import a class rather than
+  writing its qualified name in code, unless the simple name is already taken (as `java.time.Duration` takes
+  `Duration` in the GUI).
 - Keep front ends thin. Logic shared by the GUI and the CLI goes in `core`'s `service` package.
 - Handle file and parsing errors explicitly with messages that say what to do (`DataException`).
 - Don't commit generated data: `.cache/`, `out/`, `build/` and `*.aot` are ignored.

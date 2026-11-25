@@ -19,6 +19,7 @@ import javafx.beans.property.ReadOnlyObjectWrapper;
 import javafx.collections.FXCollections;
 import javafx.concurrent.Task;
 import javafx.geometry.Insets;
+import javafx.geometry.Orientation;
 import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.image.PixelReader;
@@ -38,6 +39,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Function;
 
 /**
  * The desktop window: pick an imported state, ask for a number of Democratic seats, run the
@@ -84,7 +86,7 @@ public final class App extends Application {
      */
     private Task<StateDataset> loading;
     
-    private static <T> TableColumn<DistrictResult, T> column(String name, java.util.function.Function<DistrictResult, T> f) {
+    private static <T> TableColumn<DistrictResult, T> column(String name, Function<DistrictResult, T> f) {
         TableColumn<DistrictResult, T> c = new TableColumn<>(name);
         c.setCellValueFactory(cd -> new ReadOnlyObjectWrapper<>(f.apply(cd.getValue())));
         c.setSortable(false);
@@ -95,13 +97,13 @@ public final class App extends Application {
     public void start(Stage stage) {
         this.stage = stage;
         Application.setUserAgentStylesheet(new PrimerLight().getUserAgentStylesheet());
-        BorderPane root = new BorderPane();
+        var root = new BorderPane();
         root.setLeft(controls());
-        SplitPane split = new SplitPane(mapView, resultsPane());
-        split.setOrientation(javafx.geometry.Orientation.VERTICAL);
+        var split = new SplitPane(mapView, resultsPane());
+        split.setOrientation(Orientation.VERTICAL);
         split.setDividerPositions(0.68);
         root.setCenter(split);
-        Scene scene = new Scene(root, 1360, 900);
+        var scene = new Scene(root, 1360, 900);
         stage.setTitle("autoredistrict — seat-targeted congressional maps");
         stage.setScene(scene);
         stage.setOnShown(_ -> {
@@ -138,12 +140,12 @@ public final class App extends Application {
             s.setEditable(true);
             s.setMaxWidth(Double.MAX_VALUE);
         }
-        GridPane form = new GridPane();
+        var form = new GridPane();
         form.setHgap(8);
         form.setVgap(8);
-        javafx.scene.layout.ColumnConstraints labels = new javafx.scene.layout.ColumnConstraints();
-        labels.setMinWidth(javafx.scene.layout.Region.USE_PREF_SIZE);
-        javafx.scene.layout.ColumnConstraints fields = new javafx.scene.layout.ColumnConstraints();
+        var labels = new ColumnConstraints();
+        labels.setMinWidth(Region.USE_PREF_SIZE);
+        var fields = new ColumnConstraints();
         fields.setHgrow(Priority.ALWAYS);
         form.getColumnConstraints().addAll(labels, fields);
         demRange.setWrapText(true);
@@ -168,11 +170,11 @@ public final class App extends Application {
                 running.cancel(true); // interrupts the run, which cancels the chains' structured scope
             }
         });
-        HBox buttons = new HBox(8, runButton, cancelButton);
+        var buttons = new HBox(8, runButton, cancelButton);
         HBox.setHgrow(runButton, Priority.ALWAYS);
         HBox.setHgrow(cancelButton, Priority.ALWAYS);
         
-        GridPane live = new GridPane();
+        var live = new GridPane();
         live.setHgap(8);
         live.setVgap(4);
         live.addRow(0, new Label("Phase"), phaseLabel);
@@ -186,15 +188,15 @@ public final class App extends Application {
         pngButton.setOnAction(_ -> export("png"));
         geoJsonButton.setOnAction(_ -> export("geojson"));
         csvButton.setOnAction(_ -> export("csv"));
-        HBox exports = new HBox(6, pngButton, geoJsonButton, csvButton);
+        var exports = new HBox(6, pngButton, geoJsonButton, csvButton);
         setExportsDisabled(true);
         
-        Label title = new Label("autoredistrict");
+        var title = new Label("autoredistrict");
         title.getStyleClass().add("title-3");
-        Label sub = new Label("Monte Carlo anneal after AlphaPhoenix's\n\"Elections made-to-order\"");
+        var sub = new Label("Monte Carlo anneal after AlphaPhoenix's\n\"Elections made-to-order\"");
         sub.getStyleClass().add("text-muted");
         statusLabel.setWrapText(true);
-        VBox box = new VBox(10, title, sub, new Separator(), form, buttons, progressBar, live, new Separator(), new Label("Export"), exports, new Separator(), importButton, statusLabel);
+        var box = new VBox(10, title, sub, new Separator(), form, buttons, progressBar, live, new Separator(), new Label("Export"), exports, new Separator(), importButton, statusLabel);
         box.setPadding(new Insets(16));
         box.setPrefWidth(360);
         box.setMinWidth(300);
@@ -212,7 +214,7 @@ public final class App extends Application {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(new Label("Run a plan to see its districts."));
         resultLabel.getStyleClass().add("title-4");
-        VBox v = new VBox(6, resultLabel, table);
+        var v = new VBox(6, resultLabel, table);
         v.setPadding(new Insets(8, 12, 12, 12));
         VBox.setVgrow(table, Priority.ALWAYS);
         return v;
@@ -264,7 +266,7 @@ public final class App extends Application {
             int prop = PlanOptions.proportional(dataset.demShare(), k);
             demSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, k, prop));
             demRange.setText(String.format(Locale.ROOT, "0..%d · proportional %d (D share %.1f%%)", k, prop, dataset.demShare() * 100));
-            double[] shares = new double[dataset.size()];
+            var shares = new double[dataset.size()];
             for (int i = 0; i < shares.length; i++) {
                 double d = dataset.graph().dem(i);
                 double r = dataset.graph().rep(i);
@@ -313,7 +315,7 @@ public final class App extends Application {
             progressBar.setProgress(1);
             if (opts.snapshotState() != null) {
                 // Let the table and map lay out, then capture the whole window.
-                PauseTransition pause = new PauseTransition(javafx.util.Duration.millis(600));
+                var pause = new PauseTransition(javafx.util.Duration.millis(600));
                 pause.setOnFinished(_ -> saveSnapshot());
                 pause.play();
             }
@@ -340,7 +342,7 @@ public final class App extends Application {
      */
     private Task<PlanResult> planTask(StateDataset ds, PlanOptions o) {
         Map<Integer, Double> fps = new ConcurrentHashMap<>();
-        AtomicLong lastUi = new AtomicLong();
+        var lastUi = new AtomicLong();
         Progress.Listener listener = p -> {
             fps.put(p.chain(), p.flipsPerSecond());
             long now = System.nanoTime();
@@ -395,7 +397,7 @@ public final class App extends Application {
         if (result == null) {
             return;
         }
-        FileChooser fc = new FileChooser();
+        var fc = new FileChooser();
         String stem = result.state().key() + "-" + result.demRequested() + "d";
         fc.setInitialFileName(stem + (kind.equals("csv") ? "-assignment.csv" : "." + kind));
         File f = fc.showSaveDialog(stage);
@@ -416,7 +418,7 @@ public final class App extends Application {
     }
     
     private void importFiles() {
-        FileChooser fc = new FileChooser();
+        var fc = new FileChooser();
         fc.setTitle("Select RDH tract zips (xx_pl2020_t.zip); vote files must be in the same folder");
         fc.getExtensionFilters().add(new FileChooser.ExtensionFilter("RDH PL 94-171 tract zips", "*_pl2020_t.zip"));
         List<File> files = fc.showOpenMultipleDialog(stage);
@@ -482,7 +484,7 @@ public final class App extends Application {
         WritableImage img = stage.getScene().snapshot(null);
         int w = (int) img.getWidth();
         int h = (int) img.getHeight();
-        BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
+        var out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         PixelReader pr = img.getPixelReader();
         for (int y = 0; y < h; y++) {
             for (int x = 0; x < w; x++) {
@@ -513,7 +515,7 @@ public final class App extends Application {
             Platform.exit();
             System.exit(1);
         }
-        Alert a = new Alert(Alert.AlertType.ERROR, cause.getMessage());
+        var a = new Alert(Alert.AlertType.ERROR, cause.getMessage());
         a.setHeaderText(what);
         a.show();
     }

@@ -65,7 +65,7 @@ public record PlanService(Path cacheRoot) {
         else {
             Schedule s = Schedules.forTracts(g.size(), o.scheduleScale(), o.timeBudget());
             schedule = Schedules.describe(s);
-            Target target = new Target(k, dem, o.minMargin(), o.tolerance());
+            var target = new Target(k, dem, o.minMargin(), o.tolerance());
             long[] seedList = Annealer.seeds(o.baseSeed(), o.seeds());
             List<ChainResult> rs;
             if (untilHit) {

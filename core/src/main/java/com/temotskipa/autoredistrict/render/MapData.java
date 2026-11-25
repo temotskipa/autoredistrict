@@ -29,7 +29,7 @@ public record MapData(String title, String subtitle, List<Geometry> tracts, int[
         if (focus != null && !focus.isNull()) {
             return focus;
         }
-        Envelope e = new Envelope();
+        var e = new Envelope();
         for (Geometry g : districtShapes) {
             e.expandToInclude(g.getEnvelopeInternal());
         }

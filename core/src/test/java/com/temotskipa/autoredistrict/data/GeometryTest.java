@@ -11,10 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Projection, adjacency and connectivity on small fixtures with known answers.
@@ -132,7 +129,7 @@ class GeometryTest {
         assertEquals(1, mainland.getNumGeometries());
         assertEquals(-150.0, mainland.getEnvelopeInternal().getMinX(), 1e-6);
     }
-
+    
     @Test
     void rookAdjacencyOnGridHasKnownSharedEdgesAndNoCorners() {
         List<Geometry> cells = new ArrayList<>();
@@ -167,7 +164,7 @@ class GeometryTest {
         assertEquals(10.0, lengths.get(AdjacencyBuilder.pairKey(0, 2)), 1e-9);
         assertEquals(10.0, lengths.get(AdjacencyBuilder.pairKey(1, 2)), 1e-9);
     }
-
+    
     @Test
     void aBorderThatIsOnlyPartlyHashedIsMeasuredInFull() {
         // A and B share the top edge of A, 20 long. From x=10 to 20 both have the same segment;
@@ -185,7 +182,7 @@ class GeometryTest {
         AdjacencyBuilder.Adjacency gap = AdjacencyBuilder.build(List.of(a, c), List.of(a, c));
         assertEquals(0, gap.edgeCount());
     }
-
+    
     @Test
     void islandsAreLinkedToTheirNearestNeighbour() {
         List<Geometry> geoms = List.of(Fixtures.box(0, 0, 10, 10), Fixtures.box(10, 0, 20, 10), Fixtures.box(50, 0, 60, 10), Fixtures.box(26, 30, 30, 34), Fixtures.box(80, 80, 90, 90));
@@ -197,7 +194,7 @@ class GeometryTest {
         Connectivity.Bridge first = repair.bridges().stream().filter(br -> br.a() == 1 || br.b() == 1).findFirst().orElseThrow();
         assertTrue(first.a() == 1 || first.b() == 1);
         // The graph with bridges is connected.
-        Connectivity.UnionFind uf = new Connectivity.UnionFind(geoms.size());
+        var uf = new Connectivity.UnionFind(geoms.size());
         uf.union(adj.a()[0], adj.b()[0]);
         repair.bridges().forEach(br -> uf.union(br.a(), br.b()));
         assertEquals(1, uf.count());

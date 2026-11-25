@@ -3,6 +3,7 @@ package com.temotskipa.autoredistrict.service;
 import com.temotskipa.autoredistrict.engine.Graph;
 
 import java.util.ArrayDeque;
+import java.util.Arrays;
 
 /**
  * Cosmetic clean-up after the anneal: a tract with no people and no votes (water, parks) moves
@@ -21,11 +22,11 @@ public final class EmptyTractCleanup {
      */
     public static void apply(Graph g, int[] assign, int k) {
         int n = g.size();
-        int[] count = new int[k];
+        var count = new int[k];
         for (int d : assign) {
             count[d]++;
         }
-        double[] shared = new double[k];
+        var shared = new double[k];
         for (int pass = 0; pass < 3; pass++) {
             int movedThisPass = 0;
             for (int u = 0; u < n; u++) {
@@ -38,7 +39,7 @@ public final class EmptyTractCleanup {
                 }
                 int[] nb = g.neighborsOf(u);
                 double[] len = g.edgeLengthsOf(u);
-                java.util.Arrays.fill(shared, 0);
+                Arrays.fill(shared, 0);
                 for (int j = 0; j < nb.length; j++) {
                     shared[assign[nb[j]]] += len[j];
                 }
@@ -76,7 +77,7 @@ public final class EmptyTractCleanup {
         if (size == 0) {
             return false;
         }
-        boolean[] seen = new boolean[g.size()];
+        var seen = new boolean[g.size()];
         ArrayDeque<Integer> q = new ArrayDeque<>();
         q.add(start);
         seen[start] = true;

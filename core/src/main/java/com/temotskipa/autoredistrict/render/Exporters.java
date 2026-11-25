@@ -32,9 +32,9 @@ import java.util.function.Function;
  */
 @SuppressWarnings("preview") // LazyConstant is a preview API, used on purpose
 public final class Exporters {
-
+    
     private static final LazyConstant<JsonMapper> JSON = LazyConstant.of(() -> JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build());
-
+    
     private Exporters() {
     }
     

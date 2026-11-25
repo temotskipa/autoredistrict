@@ -66,7 +66,7 @@ public final class Graph {
             throw new IllegalArgumentException("edge arrays differ in length");
         }
         int m = edgeA.length;
-        int[] degree = new int[n];
+        var degree = new int[n];
         for (int e = 0; e < m; e++) {
             int a = edgeA[e];
             int b = edgeB[e];
@@ -78,13 +78,13 @@ public final class Graph {
             degree[a]++;
             degree[b]++;
         }
-        int[] offsets = new int[n + 1];
+        var offsets = new int[n + 1];
         for (int i = 0; i < n; i++) {
             offsets[i + 1] = offsets[i] + degree[i];
         }
         int[] fill = Arrays.copyOf(offsets, n);
-        int[] nbr = new int[offsets[n]];
-        double[] len = new double[offsets[n]];
+        var nbr = new int[offsets[n]];
+        var len = new double[offsets[n]];
         for (int e = 0; e < m; e++) {
             int a = edgeA[e];
             int b = edgeB[e];
@@ -94,7 +94,7 @@ public final class Graph {
             len[fill[b]++] = edgeLen[e];
         }
         // Sort each adjacency list and merge duplicates.
-        int[] outOff = new int[n + 1];
+        var outOff = new int[n + 1];
         int w = 0;
         for (int i = 0; i < n; i++) {
             int s = offsets[i];

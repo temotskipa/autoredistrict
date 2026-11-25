@@ -5,9 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.OptionalInt;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Ported from the Python tests/test_apportionment.py.

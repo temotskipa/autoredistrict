@@ -42,7 +42,7 @@ public final class Annealer {
      * Seeds {@code base, base+1, ...}.
      */
     public static long[] seeds(long base, int count) {
-        long[] s = new long[count];
+        var s = new long[count];
         for (int i = 0; i < count; i++) {
             s[i] = base + i;
         }
@@ -54,7 +54,7 @@ public final class Annealer {
      */
     public static List<ChainResult> runAll(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener) throws InterruptedException {
         checkSeedCount(seeds);
-        Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()));
+        var cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()));
         try (var scope = StructuredTaskScope.open(Joiner.<ChainResult>allSuccessfulOrThrow(), cfg -> cfg.withName("anneal").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
             for (int i = 0; i < seeds.length; i++) {
                 int index = i;
@@ -77,10 +77,10 @@ public final class Annealer {
     public static Until runUntil(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener, Predicate<ChainResult> stop) throws InterruptedException {
         checkSeedCount(seeds);
         // Fair, so that with more chains than cores the earlier chains, which decide, start first.
-        Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()), true);
+        var cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()), true);
         // Subtasks that end after the scope is cancelled report nothing, so every chain adds its own
         // proposals here, finished or cancelled. The scope's close waits for all of them.
-        LongAdder proposals = new LongAdder();
+        var proposals = new LongAdder();
         List<ChainResult> results;
         try (var scope = StructuredTaskScope.open(new FirstInSeedOrder(stop, seeds.length), cfg -> cfg.withName("anneal-until").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
             for (int i = 0; i < seeds.length; i++) {
@@ -124,13 +124,11 @@ public final class Annealer {
     }
     
     private static RuntimeException rethrow(Throwable t) {
-        if (t instanceof RuntimeException r) {
-            return r;
-        }
-        if (t instanceof Error e) {
-            throw e;
-        }
-        return new IllegalStateException(t);
+        return switch (t) {
+            case RuntimeException r -> r;
+            case Error e -> throw e;
+            default -> new IllegalStateException(t);
+        };
     }
     
     /**
@@ -141,7 +139,7 @@ public final class Annealer {
      */
     public record Until(List<ChainResult> finished, long proposals) {
     }
-
+    
     /**
      * {@link #runUntil}'s joiner: cancels the scope once chains 0..i have all finished and i is
      * the first that {@code stop} accepts, and returns those chains. Chains that finish out of
@@ -154,24 +152,25 @@ public final class Annealer {
         private int next; // chains 0..next-1 finished and none was accepted
         private int accepted = -1;
         private Throwable failure;
-
+        
         FirstInSeedOrder(Predicate<ChainResult> stop, int chains) {
             this.stop = stop;
             this.results = new ChainResult[chains];
         }
-
+        
         @Override
         public synchronized boolean onComplete(Subtask<ChainResult> t) {
             if (accepted >= 0 || failure != null) {
                 return true;
             }
             if (t.state() == State.FAILED) {
-                Throwable ex = t.exception();
-                if (ex instanceof CancellationException || ex instanceof InterruptedException) {
-                    return false;
-                }
-                failure = ex;
-                return true;
+                return switch (t.exception()) {
+                    case CancellationException _, InterruptedException _ -> false;
+                    case Throwable ex -> {
+                        failure = ex;
+                        yield true;
+                    }
+                };
             }
             if (t.state() != State.SUCCESS) {
                 return false;
@@ -187,7 +186,7 @@ public final class Annealer {
             }
             return false;
         }
-
+        
         @Override
         public synchronized List<ChainResult> result() {
             if (failure != null) {
@@ -195,7 +194,7 @@ public final class Annealer {
             }
             return List.of(Arrays.copyOf(results, accepted >= 0 ? accepted + 1 : next));
         }
-
+        
         @Override
         public List<ChainResult> timeout() {
             return result(); // the scope has no timeout; chains keep their own time budget

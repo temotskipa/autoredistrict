@@ -6,7 +6,6 @@ import org.geotools.api.feature.simple.SimpleFeature;
 import org.geotools.api.feature.simple.SimpleFeatureType;
 import org.geotools.api.feature.type.AttributeDescriptor;
 import org.geotools.data.shapefile.ShapefileDataStore;
-import org.geotools.data.simple.SimpleFeatureIterator;
 import org.locationtech.jts.geom.Geometry;
 
 import java.io.BufferedReader;
@@ -18,7 +17,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipInputStream;
@@ -101,7 +99,7 @@ public final class RdhTractImporter {
             throw new DataException("File not found: " + path);
         }
         if (Files.isDirectory(path)) {
-            try (Stream<Path> s = Files.list(path)) {
+            try (var s = Files.list(path)) {
                 for (Path child : s.sorted().toList()) {
                     expand(child, workdir, found);
                 }
@@ -127,7 +125,7 @@ public final class RdhTractImporter {
     }
     
     static void unzip(Path zip, Path target) {
-        try (ZipInputStream in = new ZipInputStream(Files.newInputStream(zip))) {
+        try (var in = new ZipInputStream(Files.newInputStream(zip))) {
             ZipEntry entry;
             boolean any = false;
             while ((entry = in.getNextEntry()) != null) {
@@ -155,7 +153,7 @@ public final class RdhTractImporter {
     }
     
     private static Layer readLayer(Path path) {
-        String lower = path.getFileName().toString().toLowerCase(Locale.ROOT);
+        var lower = path.getFileName().toString().toLowerCase(Locale.ROOT);
         try {
             return lower.endsWith(".csv") ? readCsv(path) : readShapefile(path);
         } catch (DataException e) {
@@ -167,8 +165,8 @@ public final class RdhTractImporter {
     
     private static Layer readCsv(Path path) throws IOException {
         try (BufferedReader reader = Files.newBufferedReader(path, StandardCharsets.UTF_8)) {
-            List<String> header = Csv.header(reader, path.getFileName().toString());
-            int geoidCol = Csv.indexOf(header, GEOID_COLUMNS.toArray(String[]::new));
+            var header = Csv.header(reader, path.getFileName().toString());
+            var geoidCol = Csv.indexOf(header, GEOID_COLUMNS.toArray(String[]::new));
             if (geoidCol < 0) {
                 return null;
             }
@@ -196,10 +194,10 @@ public final class RdhTractImporter {
     }
     
     private static Layer readShapefile(Path shp) throws IOException {
-        Path prj = sibling(shp, ".prj");
-        String prjWkt = prj == null ? null : Files.readString(prj, StandardCharsets.UTF_8).strip();
-        Path cpg = sibling(shp, ".cpg");
-        Charset charset = StandardCharsets.ISO_8859_1;
+        var prj = sibling(shp, ".prj");
+        var prjWkt = prj == null ? null : Files.readString(prj, StandardCharsets.UTF_8).strip();
+        var cpg = sibling(shp, ".cpg");
+        var charset = StandardCharsets.ISO_8859_1;
         if (cpg != null) {
             try {
                 charset = Charset.forName(Files.readString(cpg).strip());
@@ -207,7 +205,7 @@ public final class RdhTractImporter {
                 // Unknown code page name: keep Latin-1.
             }
         }
-        ShapefileDataStore store = new ShapefileDataStore(shp.toUri().toURL());
+        var store = new ShapefileDataStore(shp.toUri().toURL());
         try {
             store.setCharset(charset);
             store.setMemoryMapped(false);
@@ -233,14 +231,14 @@ public final class RdhTractImporter {
             if (geomCol != null) {
                 props.add(geomCol);
             }
-            Query query = new Query(schema.getTypeName());
+            var query = new Query(schema.getTypeName());
             query.setPropertyNames(props.toArray(String[]::new));
             SimpleFeatureSource source = store.getFeatureSource();
             List<String> geoids = new ArrayList<>();
             List<String> names = new ArrayList<>();
             List<Long> pops = new ArrayList<>();
             List<Geometry> geoms = new ArrayList<>();
-            try (SimpleFeatureIterator it = source.getFeatures(query).features()) {
+            try (var it = source.getFeatures(query).features()) {
                 while (it.hasNext()) {
                     SimpleFeature f = it.next();
                     Object id = f.getAttribute(geoidCol);
@@ -250,10 +248,10 @@ public final class RdhTractImporter {
                     geoids.add(id instanceof Number n ? Long.toString(n.longValue()) : id.toString());
                     names.add(nameCol == null || f.getAttribute(nameCol) == null ? "" : f.getAttribute(nameCol).toString());
                     if (popCol != null) {
-                        Object v = f.getAttribute(popCol);
+                        var v = f.getAttribute(popCol);
                         pops.add(parseCount(v == null ? "" : v.toString(), popCol, shp));
                     }
-                    Object g = geomCol == null ? null : f.getAttribute(geomCol);
+                    var g = geomCol == null ? null : f.getAttribute(geomCol);
                     geoms.add(g instanceof Geometry geometry ? geometry : null);
                 }
             }
@@ -265,7 +263,7 @@ public final class RdhTractImporter {
     }
     
     private static long parseCount(String raw, String column, Path source) {
-        String s = raw.strip();
+        var s = raw.strip();
         if (s.endsWith(".0")) {
             s = s.substring(0, s.length() - 2);
         }
@@ -311,7 +309,7 @@ public final class RdhTractImporter {
             }
         }
         if (states.size() != 1) {
-            throw new DataException(source.getFileName() + " covers several states (" + String.join(", ", new java.util.TreeSet<>(states)) + "); import one state at a time.");
+            throw new DataException(source.getFileName() + " covers several states (" + String.join(", ", new TreeSet<>(states)) + "); import one state at a time.");
         }
         return new Layer(source, ids, names, pop, geoms, prjWkt, states.iterator().next(), resolution);
     }
@@ -353,7 +351,7 @@ public final class RdhTractImporter {
             warnings.add("Dropped " + extra + " shapes with no population counts.");
         }
         int n = counts.geoids.size();
-        int[] pop = new int[n];
+        var pop = new int[n];
         List<Geometry> geoms = new ArrayList<>(n);
         for (int i = 0; i < n; i++) {
             long p = counts.pop[i];
@@ -363,7 +361,7 @@ public final class RdhTractImporter {
             pop[i] = (int) p;
             geoms.add(shapes.get(counts.geoids.get(i)));
         }
-        List<String> members = new ArrayList<>(new java.util.TreeSet<>(List.of(counts.source.getFileName().toString(), geometry.source.getFileName().toString())));
+        List<String> members = new ArrayList<>(new TreeSet<>(List.of(counts.source.getFileName().toString(), geometry.source.getFileName().toString())));
         return new TractLayer(counts.stateFips, List.copyOf(counts.geoids), List.copyOf(counts.names), pop, List.copyOf(geoms), geometry.prjWkt, members, warnings);
     }
     
@@ -393,7 +391,7 @@ public final class RdhTractImporter {
         if (root == null || !Files.exists(root)) {
             return;
         }
-        try (Stream<Path> walk = Files.walk(root)) {
+        try (var walk = Files.walk(root)) {
             for (Path p : walk.sorted(Comparator.reverseOrder()).toList()) {
                 Files.deleteIfExists(p);
             }
@@ -407,7 +405,7 @@ public final class RdhTractImporter {
      * Opens the first .csv entry of a zip as a stream.
      */
     static InputStream openZipCsv(Path zip) throws IOException {
-        ZipInputStream in = new ZipInputStream(Files.newInputStream(zip));
+        var in = new ZipInputStream(Files.newInputStream(zip));
         ZipEntry e;
         while ((e = in.getNextEntry()) != null) {
             if (!e.isDirectory() && e.getName().toLowerCase(Locale.ROOT).endsWith(".csv")) {

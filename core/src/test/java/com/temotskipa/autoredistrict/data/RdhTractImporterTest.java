@@ -44,7 +44,7 @@ class RdhTractImporterTest {
         assertEquals(16, ds.geometry().size());
         assertEquals("2024", ds.voteDataLabel());
     }
-
+    
     @Test
     void aVoteFileWithNoVotesInTheStateIsRefusedAndNothingIsCached() throws Exception {
         Path zip = Fixtures.tractZip(tmp, "me_pl2020_t", Fixtures.grid("23", 2));
@@ -54,13 +54,13 @@ class RdhTractImporterTest {
         StateInfo me = States.require("ME");
         DataException e = assertThrows(DataException.class, () -> StateImporter.importState(me, zip, votes, cache));
         assertTrue(e.getMessage().startsWith("me_2024_gen_2020_blocks_csv.zip has no D or R presidential votes in ME's tracts"), e.getMessage());
-        assertTrue(java.nio.file.Files.notExists(TractCache.stateDir(cache, me)), "nothing cached");
+        assertTrue(Files.notExists(TractCache.stateDir(cache, me)), "nothing cached");
     }
-
+    
     @Test
     void csvWithNumericGeoidsAndSeparateGeometryIsPadded() throws Exception {
         List<Fixtures.Tract> tracts = Fixtures.grid("01", 4);
-        StringBuilder csv = new StringBuilder("GEOID20,NAME,P0010001\n");
+        var csv = new StringBuilder("GEOID20,NAME,P0010001\n");
         for (Fixtures.Tract t : tracts) {
             // A numeric read lost the leading zero and added ".0".
             csv.append(Long.parseLong(t.geoid())).append(".0,").append(t.name()).append(',').append(t.pop()).append('\n');
@@ -88,7 +88,7 @@ class RdhTractImporterTest {
     
     @Test
     void needsGeometryAndWritesNoCacheWithoutIt() throws Exception {
-        StringBuilder csv = new StringBuilder("GEOID20,NAME,P0010001\n");
+        var csv = new StringBuilder("GEOID20,NAME,P0010001\n");
         for (Fixtures.Tract t : Fixtures.grid("23", 4)) {
             csv.append(t.geoid()).append(',').append(t.name()).append(',').append(t.pop()).append('\n');
         }
@@ -112,17 +112,28 @@ class RdhTractImporterTest {
     @Test
     void rejectsDuplicateGeoidsAndSeveralStates() throws Exception {
         Path dup = tmp.resolve("dup.csv");
-        Files.writeString(dup, "GEOID20,P0010001\n23001000100,5\n23001000100,6\n");
+        Files.writeString(dup, """
+                               GEOID20,P0010001
+                               23001000100,5
+                               23001000100,6
+                               """);
         assertTrue(assertThrows(DataException.class, () -> RdhTractImporter.read(List.of(dup), null, null)).getMessage().contains("duplicate GEOIDs"));
         Path two = tmp.resolve("two.csv");
-        Files.writeString(two, "GEOID20,P0010001\n23001000100,5\n50001000100,6\n");
+        Files.writeString(two, """
+                               GEOID20,P0010001
+                               23001000100,5
+                               50001000100,6
+                               """);
         assertTrue(assertThrows(DataException.class, () -> RdhTractImporter.read(List.of(two), null, null)).getMessage().contains("covers several states (23, 50)"));
     }
     
     @Test
     void rejectsBlockLevelFilesAndBadZips() throws Exception {
         Path blocks = tmp.resolve("me_pl2020_b.csv");
-        Files.writeString(blocks, "GEOID20,P0010001\n230010001001000,5\n");
+        Files.writeString(blocks, """
+                                  GEOID20,P0010001
+                                  230010001001000,5
+                                  """);
         assertTrue(assertThrows(DataException.class, () -> RdhTractImporter.read(List.of(blocks), null, null)).getMessage().contains("block level"));
         Path bad = tmp.resolve("bad.zip");
         Files.writeString(bad, "not a zip");

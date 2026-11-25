@@ -6,11 +6,7 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.Polygon;
 import org.locationtech.jts.index.strtree.STRtree;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * Rook adjacency for a polygon coverage. RDH tract shapes come from Census TIGER, so neighbouring
@@ -21,7 +17,7 @@ import java.util.Map;
  * contact isn't adjacency.
  */
 public final class AdjacencyBuilder {
-
+    
     /**
      * Shared boundaries shorter than this (metres) are treated as corner contact.
      */
@@ -31,10 +27,10 @@ public final class AdjacencyBuilder {
      */
     static final double OVERLAP_TOLERANCE_METRES = 0.05;
     private static final double SNAP = 1e7;
-
+    
     private AdjacencyBuilder() {
     }
-
+    
     /**
      * @param lonLat    geometries in geographic coordinates, as read from the shapefile
      * @param projected the same geometries projected to metres, vertex for vertex
@@ -45,9 +41,9 @@ public final class AdjacencyBuilder {
         for (Geometry g : lonLat) {
             segments += g.getNumPoints();
         }
-        SegmentTable table = new SegmentTable(segments);
+        var table = new SegmentTable(segments);
         Map<Long, double[]> shared = new HashMap<>();
-        double[] perimeter = new double[n];
+        var perimeter = new double[n];
         for (int i = 0; i < n; i++) {
             perimeter[i] = projected.get(i).getLength();
             List<Coordinate[]> ro = rings(lonLat.get(i));
@@ -95,10 +91,10 @@ public final class AdjacencyBuilder {
             lens.add(len);
         }
         int m = pairs.size();
-        int[] a = new int[m];
-        int[] b = new int[m];
-        double[] len = new double[m];
-        double[] sharedSum = new double[n];
+        var a = new int[m];
+        var b = new int[m];
+        var len = new double[m];
+        var sharedSum = new double[n];
         for (int e = 0; e < m; e++) {
             a[e] = pairs.get(e)[0];
             b[e] = pairs.get(e)[1];
@@ -106,13 +102,13 @@ public final class AdjacencyBuilder {
             sharedSum[a[e]] += len[e];
             sharedSum[b[e]] += len[e];
         }
-        double[] outer = new double[n];
+        var outer = new double[n];
         for (int i = 0; i < n; i++) {
             outer[i] = Math.max(0, perimeter[i] - sharedSum[i]);
         }
         return new Adjacency(a, b, len, perimeter, outer, hashed, unhashed);
     }
-
+    
     /**
      * Adds the borders the segment hash missed: stretches where one unit has a vertex the other
      * lacks (a T-junction), whether they are a pair's whole border or only part of it. Neither
@@ -124,7 +120,7 @@ public final class AdjacencyBuilder {
      * @return the number of pairs that gained at least {@link #MIN_SHARED_METRES}
      */
     private static int addUnhashedBorders(List<Geometry> lonLat, List<Geometry> projected, SegmentTable table, Map<Long, double[]> shared) {
-        Unmatched un = new Unmatched();
+        var un = new Unmatched();
         for (int i = 0; i < lonLat.size(); i++) {
             List<Coordinate[]> ro = rings(lonLat.get(i));
             List<Coordinate[]> rp = rings(projected.get(i));
@@ -141,7 +137,7 @@ public final class AdjacencyBuilder {
             }
         }
         double tol = OVERLAP_TOLERANCE_METRES;
-        STRtree tree = new STRtree();
+        var tree = new STRtree();
         for (int s = 0; s < un.size; s++) {
             tree.insert(un.envelope(s, tol), s);
         }
@@ -171,7 +167,7 @@ public final class AdjacencyBuilder {
         }
         return count;
     }
-
+    
     /**
      * Exterior and interior rings of each polygon, in order, so that the rings of a geometry and of
      * its vertex-for-vertex projection line up.
@@ -187,19 +183,19 @@ public final class AdjacencyBuilder {
         }
         return out;
     }
-
+    
     static long key(Coordinate c) {
         long lon = Math.round((c.x + 200.0) * SNAP);
         long lat = Math.round((c.y + 90.0) * SNAP);
         return (lon << 32) | (lat & 0xffffffffL);
     }
-
+    
     static long pairKey(int i, int j) {
         int lo = Math.min(i, j);
         int hi = Math.max(i, j);
         return ((long) lo << 32) | (hi & 0xffffffffL);
     }
-
+    
     /**
      * Undirected edges with shared lengths, plus each unit's perimeter and outer boundary.
      *
@@ -207,12 +203,12 @@ public final class AdjacencyBuilder {
      * @param fallbackPairs pairs whose border the hash missed by at least {@link #MIN_SHARED_METRES}, in whole or in part
      */
     public record Adjacency(int[] a, int[] b, double[] length, double[] perimeter, double[] outer, int hashedPairs, int fallbackPairs) {
-
+        
         public int edgeCount() {
             return a.length;
         }
     }
-
+    
     /**
      * Open-addressing hash of segments (two packed endpoints) to the first unit that had it.
      */
@@ -221,7 +217,7 @@ public final class AdjacencyBuilder {
         private final long[] kb;
         private final int[] owner;
         private final int mask;
-
+        
         SegmentTable(long expected) {
             int cap = Integer.highestOneBit(Math.clamp(expected * 2, 16, 1 << 30) - 1) << 1;
             ka = new long[cap];
@@ -230,12 +226,12 @@ public final class AdjacencyBuilder {
             Arrays.fill(owner, -1);
             mask = cap - 1;
         }
-
+        
         private int slot(long p, long q) {
             long h = p * 0x9E3779B97F4A7C15L ^ q * 0xC2B2AE3D27D4EB4FL;
             return (int) (h ^ (h >>> 31)) & mask;
         }
-
+        
         /**
          * Records the segment for {@code unit}. Returns the other unit if the segment was already
          * recorded by a different one (consuming it), -1 if this is its first sighting.
@@ -260,7 +256,7 @@ public final class AdjacencyBuilder {
                 slot = (slot + 1) & mask;
             }
         }
-
+        
         /**
          * The unit that recorded the segment if no other unit matched it, -2 if one did, -1 if it
          * was never recorded.
@@ -276,7 +272,7 @@ public final class AdjacencyBuilder {
             }
         }
     }
-
+    
     /**
      * Segments no other unit matched, in projected metres, with the unit each belongs to.
      */
@@ -287,7 +283,7 @@ public final class AdjacencyBuilder {
         private double[] y2 = new double[1024];
         private int[] unit = new int[1024];
         private int size;
-
+        
         void add(int u, Coordinate p, Coordinate q) {
             if (size == unit.length) {
                 int cap = size * 2;
@@ -303,20 +299,20 @@ public final class AdjacencyBuilder {
             y2[size] = q.y;
             unit[size++] = u;
         }
-
+        
         Envelope envelope(int s, double pad) {
-            Envelope e = new Envelope(x1[s], x2[s], y1[s], y2[s]);
+            var e = new Envelope(x1[s], x2[s], y1[s], y2[s]);
             e.expandBy(pad);
             return e;
         }
-
+        
         /**
          * Length of the stretch along which segments s and t lie within {@code tol} of each other.
          */
         double overlap(int s, int t, double tol) {
             return Math.max(along(s, t, tol), along(t, s, tol));
         }
-
+        
         /**
          * How much of segment s lies under t, if both ends of t are within {@code tol} of s's line.
          */

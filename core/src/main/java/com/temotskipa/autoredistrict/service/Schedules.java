@@ -6,6 +6,8 @@ import com.temotskipa.autoredistrict.engine.Weights;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
 
 /**
  * The three-phase schedule from the video, with step counts proportional to the tract count so
@@ -44,17 +46,11 @@ public final class Schedules {
      * "shape 2.7M, explore 2.7M, elect 8.3M (+5.5M)" for reports.
      */
     public static String describe(Schedule s) {
-        StringBuilder sb = new StringBuilder();
-        for (Phase p : s.phases()) {
-            if (!sb.isEmpty()) {
-                sb.append(", ");
-            }
-            sb.append(p.name()).append(' ').append(millions(p.steps()));
-        }
-        return sb.append(" (+").append(millions(s.extraSteps())).append(" until in tolerance)").toString();
+        String phases = s.phases().stream().map(p -> p.name() + " " + millions(p.steps())).collect(Collectors.joining(", "));
+        return phases + " (+" + millions(s.extraSteps()) + " until in tolerance)";
     }
     
     private static String millions(long n) {
-        return String.format(java.util.Locale.ROOT, "%.1fM", n / 1e6);
+        return String.format(Locale.ROOT, "%.1fM", n / 1e6);
     }
 }

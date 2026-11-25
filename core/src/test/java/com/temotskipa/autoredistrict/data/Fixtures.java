@@ -52,7 +52,7 @@ final class Fixtures {
     }
     
     static Polygon poly(double... xy) {
-        Coordinate[] c = new Coordinate[xy.length / 2 + 1];
+        var c = new Coordinate[xy.length / 2 + 1];
         for (int i = 0; i < xy.length / 2; i++) {
             c[i] = new Coordinate(xy[2 * i], xy[2 * i + 1]);
         }
@@ -65,7 +65,7 @@ final class Fixtures {
      */
     static void shapefile(Path folder, String name, List<Tract> tracts, boolean withCounts) throws Exception {
         Files.createDirectories(folder);
-        SimpleFeatureTypeBuilder b = new SimpleFeatureTypeBuilder();
+        var b = new SimpleFeatureTypeBuilder();
         b.setName(name);
         b.setCRS(CRS.parseWKT(AlbersProjection.NAD83_ESRI));
         b.add("the_geom", MultiPolygon.class);
