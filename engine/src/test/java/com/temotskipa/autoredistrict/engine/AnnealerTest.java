@@ -96,9 +96,27 @@ class AnnealerTest {
         Graph g = planted();
         Annealer.Until u = Annealer.runUntil(g, new Target(4, 2, 2.0, 0.02), Grids.schedule(10_000), Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, r -> true);
         List<ChainResult> rs = u.finished();
-        assertTrue(!rs.isEmpty() && rs.size() <= 3);
+        assertEquals(List.of(0), rs.stream().map(ChainResult::chain).toList(), "chain 0 decides, whoever finishes first");
         long finished = rs.stream().mapToLong(ChainResult::proposals).sum();
         assertTrue(u.proposals() >= finished, "every chain's proposals are counted: " + u.proposals() + " < " + finished);
         assertEquals(0, chainThreads());
+    }
+
+    @Test
+    void runUntilTakesTheFirstAcceptedChainInSeedOrderEveryTime() throws InterruptedException {
+        Graph g = planted();
+        Target t = new Target(4, 2, 2.0, 0.02);
+        Schedule s = Grids.schedule(10_000);
+        long[] seeds = Annealer.seeds(9, 6);
+        // Chain 0 is refused, so chain 1 is the answer however the six chains are scheduled.
+        for (int run = 0; run < 3; run++) {
+            Annealer.Until u = Annealer.runUntil(g, t, s, Grids.BFS_VORONOI, seeds, Progress.Listener.NONE, r -> r.chain() >= 1);
+            assertEquals(List.of(0, 1), u.finished().stream().map(ChainResult::chain).toList(), "run " + run);
+            ChainResult one = Chain.run(g, t, s, Grids.BFS_VORONOI, SingleFlip.INSTANCE, seeds[1], 1, Progress.Listener.NONE);
+            assertArrayEquals(one.assignment(), u.finished().get(1).assignment(), "run " + run);
+        }
+        // Nothing accepted: every chain finishes and is returned.
+        Annealer.Until none = Annealer.runUntil(g, t, s, Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, r -> false);
+        assertEquals(List.of(0, 1, 2), none.finished().stream().map(ChainResult::chain).toList());
     }
 }

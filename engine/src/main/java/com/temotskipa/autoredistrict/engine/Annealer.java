@@ -1,6 +1,7 @@
 package com.temotskipa.autoredistrict.engine;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.CancellationException;
@@ -68,17 +69,20 @@ public final class Annealer {
     }
     
     /**
-     * Runs the chains until one finishes with a result {@code stop} accepts, then cancels the
-     * rest (structured concurrency's {@code Joiner.allUntil}).
+     * Runs the chains until the first one in seed order whose result {@code stop} accepts has
+     * finished, along with every chain before it, then cancels the rest. Waiting for the earlier
+     * chains makes the outcome independent of which chain happens to finish first, so a seed gives
+     * the same plan on every run.
      */
     public static Until runUntil(Graph g, Target target, Schedule schedule, InitialMap initial, long[] seeds, Progress.Listener listener, Predicate<ChainResult> stop) throws InterruptedException {
         checkSeedCount(seeds);
-        Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()));
+        // Fair, so that with more chains than cores the earlier chains, which decide, start first.
+        Semaphore cores = new Semaphore(Math.min(seeds.length, Runtime.getRuntime().availableProcessors()), true);
         // Subtasks that end after the scope is cancelled report nothing, so every chain adds its own
         // proposals here, finished or cancelled. The scope's close waits for all of them.
         LongAdder proposals = new LongAdder();
-        List<Subtask<ChainResult>> done;
-        try (var scope = StructuredTaskScope.open(Joiner.<ChainResult>allUntil(t -> t.state() == State.SUCCESS && stop.test(t.get())), cfg -> cfg.withName("anneal-until").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
+        List<ChainResult> results;
+        try (var scope = StructuredTaskScope.open(new FirstInSeedOrder(stop, seeds.length), cfg -> cfg.withName("anneal-until").withThreadFactory(Thread.ofPlatform().name("chain-", 0).factory()))) {
             for (int i = 0; i < seeds.length; i++) {
                 int index = i;
                 scope.fork(() -> {
@@ -92,23 +96,8 @@ public final class Annealer {
                     }
                 });
             }
-            done = scope.join();
+            results = scope.join();
         }
-        List<ChainResult> results = new ArrayList<>();
-        for (Subtask<ChainResult> t : done) {
-            switch (t.state()) {
-                case SUCCESS -> results.add(t.get());
-                case FAILED -> {
-                    Throwable ex = t.exception();
-                    if (!(ex instanceof CancellationException) && !(ex instanceof InterruptedException)) {
-                        throw rethrow(ex);
-                    }
-                }
-                case UNAVAILABLE -> {
-                }
-            }
-        }
-        results.sort(Comparator.comparingInt(ChainResult::chain));
         return new Until(results, proposals.sum());
     }
     
@@ -147,9 +136,69 @@ public final class Annealer {
     /**
      * What {@link #runUntil} returns.
      *
-     * @param finished  the chains whose results are available, in seed order
+     * @param finished  chains 0 to the first accepted one (all of them if none was), in seed order
      * @param proposals proposals made by every chain, including the cancelled ones
      */
     public record Until(List<ChainResult> finished, long proposals) {
+    }
+
+    /**
+     * {@link #runUntil}'s joiner: cancels the scope once chains 0..i have all finished and i is
+     * the first that {@code stop} accepts, and returns those chains. Chains that finish out of
+     * order are held until the ones before them have finished. A chain failing with anything but
+     * cancellation cancels the scope, and {@link StructuredTaskScope#join} throws its exception.
+     */
+    private static final class FirstInSeedOrder implements Joiner<ChainResult, List<ChainResult>, RuntimeException> {
+        private final Predicate<ChainResult> stop;
+        private final ChainResult[] results;
+        private int next; // chains 0..next-1 finished and none was accepted
+        private int accepted = -1;
+        private Throwable failure;
+
+        FirstInSeedOrder(Predicate<ChainResult> stop, int chains) {
+            this.stop = stop;
+            this.results = new ChainResult[chains];
+        }
+
+        @Override
+        public synchronized boolean onComplete(Subtask<ChainResult> t) {
+            if (accepted >= 0 || failure != null) {
+                return true;
+            }
+            if (t.state() == State.FAILED) {
+                Throwable ex = t.exception();
+                if (ex instanceof CancellationException || ex instanceof InterruptedException) {
+                    return false;
+                }
+                failure = ex;
+                return true;
+            }
+            if (t.state() != State.SUCCESS) {
+                return false;
+            }
+            ChainResult r = t.get();
+            results[r.chain()] = r;
+            while (next < results.length && results[next] != null) {
+                if (stop.test(results[next])) {
+                    accepted = next;
+                    return true;
+                }
+                next++;
+            }
+            return false;
+        }
+
+        @Override
+        public synchronized List<ChainResult> result() {
+            if (failure != null) {
+                throw rethrow(failure);
+            }
+            return List.of(Arrays.copyOf(results, accepted >= 0 ? accepted + 1 : next));
+        }
+
+        @Override
+        public List<ChainResult> timeout() {
+            return result(); // the scope has no timeout; chains keep their own time budget
+        }
     }
 }

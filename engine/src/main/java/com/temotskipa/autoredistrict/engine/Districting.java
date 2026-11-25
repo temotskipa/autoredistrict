@@ -72,10 +72,10 @@ public final class Districting {
     private final int[] same;
     private final int[] ufp;
     private final int[] act;
+    private final int[] grp;
     private final int[] block;
     private final int[] seeds2;
     private final int[] piece = new int[MAX_PIECE];
-    private final int[] moveBuf = new int[MAX_PIECE + 1];
     private int blockStamp;
     private int sameCount;
     private int pieceSize = -1;
@@ -187,6 +187,7 @@ public final class Districting {
         this.same = new int[md];
         this.ufp = new int[md];
         this.act = new int[md];
+        this.grp = new int[md];
         this.block = new int[n];
         this.seeds2 = new int[md];
         recomputeAll();
@@ -515,6 +516,87 @@ public final class Districting {
      * runs out (which finds the smaller side of a split quickly).
      */
     boolean removalKeepsConnected(int u) {
+        if (neighboursMeetLocally(u)) {
+            return true;
+        }
+        nextBlock();
+        block[u] = blockStamp;
+        return seedsConnect(assign[u], same, sameCount);
+    }
+
+    /**
+     * Whether removing {@code u} cuts a piece of at most {@link #MAX_PIECE} units off its district,
+     * kept in {@link #piece} for {@link #tryPieceMove}. Like {@link #removalKeepsConnected} it
+     * searches from each same-district neighbour at once, but a search stops growing once it holds
+     * more than {@code MAX_PIECE} units, so the cost is bounded by the unit's degree however large
+     * the district. The first search to run out within the limit is the piece.
+     */
+    boolean cutsOffSmallPiece(int u) {
+        if (neighboursMeetLocally(u)) {
+            return false;
+        }
+        int a = assign[u];
+        int m = sameCount;
+        nextBlock();
+        block[u] = blockStamp;
+        nextStamp();
+        int head = 0;
+        int tail = 0;
+        for (int i = 0; i < m; i++) {
+            int s = same[i];
+            visit[s] = stamp;
+            lab[s] = i;
+            ufp[i] = i;
+            act[i] = 1;
+            grp[i] = 1;
+            queue[tail++] = s;
+        }
+        int groups = m;
+        while (head < tail) {
+            int x = queue[head++];
+            int r = find(lab[x]);
+            act[r]--;
+            if (grp[r] > MAX_PIECE) {
+                continue; // too big to be the piece: stop growing it
+            }
+            for (int e = off[x]; e < off[x + 1]; e++) {
+                int v = nbr[e];
+                if (block[v] == blockStamp || assign[v] != a) {
+                    continue;
+                }
+                if (visit[v] != stamp) {
+                    visit[v] = stamp;
+                    lab[v] = r;
+                    queue[tail++] = v;
+                    act[r]++;
+                    grp[r]++;
+                }
+                else {
+                    int r2 = find(lab[v]);
+                    if (r2 != r) {
+                        ufp[r2] = r;
+                        act[r] += act[r2];
+                        grp[r] += grp[r2];
+                        if (--groups == 1) {
+                            return false;
+                        }
+                    }
+                }
+            }
+            if (act[r] == 0 && grp[r] <= MAX_PIECE) {
+                collectPiece(r, tail);
+                return pieceSize > 0;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Collects {@code u}'s same-district neighbours in {@link #same} and returns true if there is
+     * at most one or they are connected through each other, the cheap case in which removing
+     * {@code u} can't split the district.
+     */
+    private boolean neighboursMeetLocally(int u) {
         int a = assign[u];
         int m = 0;
         for (int e = off[u]; e < off[u + 1]; e++) {
@@ -549,21 +631,14 @@ public final class Districting {
                 }
             }
         }
-        if (groups == 1) {
-            return true;
-        }
-        nextBlock();
-        block[u] = blockStamp;
-        return seedsConnect(a, same, m, true);
+        return groups == 1;
     }
     
     /**
      * Simultaneous BFS inside district {@code a} from each seed, skipping blocked units. Returns
-     * true once all seeds have met. Returns false as soon as one search runs out, which is the
-     * smaller side of the split; with {@code collect}, that side is kept in {@link #piece} if it
-     * has at most {@link #MAX_PIECE} units.
+     * true once all seeds have met, false as soon as one search runs out.
      */
-    private boolean seedsConnect(int a, int[] seeds, int m, boolean collect) {
+    private boolean seedsConnect(int a, int[] seeds, int m) {
         nextStamp();
         int head = 0;
         int tail = 0;
@@ -603,9 +678,6 @@ public final class Districting {
                 }
             }
             if (act[r] == 0) {
-                if (collect) {
-                    collectPiece(r, tail);
-                }
                 return false;
             }
         }
@@ -628,15 +700,21 @@ public final class Districting {
     }
     
     /**
-     * After {@link #removalKeepsConnected(int)} returned false for {@code u}: whether the rest of
-     * the district (without {@code u} and the small piece it cuts off) is still connected.
+     * Blocks {@code u} and the piece it cuts off, the units of a pruning move.
      */
-    private boolean pieceRemainderConnected(int u) {
+    private void blockPieceMove(int u) {
         nextBlock();
         block[u] = blockStamp;
         for (int i = 0; i < pieceSize; i++) {
             block[piece[i]] = blockStamp;
         }
+    }
+    
+    /**
+     * After {@link #blockPieceMove(int)}: whether the rest of the district (without {@code u} and
+     * the small piece it cuts off) is still connected.
+     */
+    private boolean pieceRemainderConnected(int u) {
         int m = 0;
         for (int i = 0; i < sameCount; i++) {
             if (block[same[i]] != blockStamp) {
@@ -646,58 +724,115 @@ public final class Districting {
         if (m == 0) {
             return false;
         }
-        return m == 1 || seedsConnect(assign[u], seeds2, m, false);
+        return m == 1 || seedsConnect(assign[u], seeds2, m);
     }
     
     /**
      * The pruning move: when flipping {@code u} would cut a small piece (at most
      * {@link #MAX_PIECE} units) off its district, move {@code u} and that piece to {@code b}
-     * together. Applied as exact single-unit updates, accepted on the summed score change at
-     * temperature {@code t}, and undone exactly if rejected. Without it a district whose whole
-     * boundary consists of cut vertices (a one-tract-wide tail) can never shrink.
-     * Call right after {@code removalKeepsConnected(u)} returned false.
+     * together. One Metropolis test at temperature {@code t} on the whole move's score change
+     * ({@link #pieceDelta}) decides; an accepted move is applied as exact single-unit updates.
+     * Without it a district whose whole boundary consists of cut vertices (a one-tract-wide tail)
+     * can never shrink. Call right after {@code cutsOffSmallPiece(u)} returned true.
      */
     boolean tryPieceMove(int u, int b, double t, SplittableRandom rng) {
-        if (pieceSize <= 0 || !pieceRemainderConnected(u)) {
+        double total = pieceDelta(u, b);
+        if (Double.isNaN(total) || (total > 0 && rng.nextDouble() >= Math.exp(-total / t))) {
             return false;
         }
-        int a = assign[u];
-        int cnt = 0;
-        moveBuf[cnt++] = u;
-        for (int i = 0; i < pieceSize; i++) {
-            moveBuf[cnt++] = piece[i];
+        // Checked after the test, like a single flip's contiguity: most moves are rejected first.
+        if (!pieceRemainderConnected(u)) {
+            return false;
         }
+        int cnt = pieceSize;
         boolean hb = hardBound;
-        hardBound = false;
-        long popA0 = pop[a];
-        long popB0 = pop[b];
-        double total = 0;
-        int moved = 0;
-        for (; moved < cnt; moved++) {
-            double dl = evaluate(moveBuf[moved], b);
-            if (Double.isNaN(dl)) {
-                break;
-            }
-            commit();
-            total += dl;
-        }
-        boolean ok = moved == cnt;
-        if (ok && hb && ((inside(popA0) && !inside(pop[a])) || (inside(popB0) && !inside(pop[b])))) {
-            ok = false;
-        }
-        if (ok && total > 0 && rng.nextDouble() >= Math.exp(-total / t)) {
-            ok = false;
-        }
-        if (!ok) {
-            for (int i = moved - 1; i >= 0; i--) {
-                if (Double.isNaN(evaluate(moveBuf[i], a))) {
-                    throw new IllegalStateException("could not undo a piece move");
+        hardBound = false; // the bound applies to the whole move, which pieceDelta checked
+        try {
+            for (int i = -1; i < cnt; i++) {
+                if (Double.isNaN(evaluate(i < 0 ? u : piece[i], b))) {
+                    throw new IllegalStateException("could not apply a piece move at unit " + (i < 0 ? u : piece[i]));
                 }
                 commit();
             }
+        } finally {
+            hardBound = hb;
         }
-        hardBound = hb;
-        return ok;
+        return true;
+    }
+    
+    /**
+     * The score change of moving {@code u} and the piece it cuts off to {@code b} together,
+     * computed from the district tallies without changing them (every term is a function of
+     * per-district sums). NaN if the move would push a district that is inside the population
+     * bound outside it; whether the rest of the district stays connected isn't checked here.
+     * Call right after {@code cutsOffSmallPiece(u)} returned true.
+     */
+    double pieceDelta(int u, int b) {
+        pu = -1; // scratch is reused below, so no single move stays pending
+        if (pieceSize <= 0) {
+            return Double.NaN;
+        }
+        blockPieceMove(u); // the blocked units are the move
+        int a = assign[u];
+        long dp = 0;
+        double dw = 0;
+        double dsx = 0;
+        double dsy = 0;
+        double dsxx = 0;
+        double dar = 0;
+        double dd = 0;
+        double dr = 0;
+        double la = 0;
+        double lb = 0;
+        double lt = 0;
+        for (int i = -1; i < pieceSize; i++) {
+            int s = i < 0 ? u : piece[i];
+            double ws = uw[s];
+            double xs = ux[s];
+            double ys = uy[s];
+            dp += upop[s];
+            dw += ws;
+            dsx += ws * xs;
+            dsy += ws * ys;
+            dsxx += ws * (xs * xs + ys * ys);
+            dar += uarea[s];
+            dd += udem[s];
+            dr += urep[s];
+            for (int e = off[s]; e < off[s + 1]; e++) {
+                int v = nbr[e];
+                if (block[v] == blockStamp) {
+                    continue; // moves too: the edge stays inside one district
+                }
+                double len = elen[e];
+                lt += len;
+                int dv = assign[v];
+                if (dv == a) {
+                    la += len;
+                }
+                else if (dv == b) {
+                    lb += len;
+                }
+            }
+        }
+        long na = pop[a] - dp;
+        long nb = pop[b] + dp;
+        if (hardBound && ((inside(pop[a]) && !inside(na)) || (inside(pop[b]) && !inside(nb)))) {
+            return Double.NaN;
+        }
+        double areaA = area[a] - dar;
+        double areaB = area[b] + dar;
+        double popA = popTermOf(na);
+        double popB = popTermOf(nb);
+        double compA = compOf(w[a] - dw, sx[a] - dsx, sy[a] - dsy, sxx[a] - dsxx, areaA);
+        double compB = compOf(w[b] + dw, sx[b] + dsx, sy[b] + dsy, sxx[b] + dsxx, areaB);
+        double tensA = tensOf(cut[a] + 2 * la - lt, areaA);
+        double tensB = tensOf(cut[b] + lt - 2 * lb, areaB);
+        double delta = wPop * (popA + popB - popTerm[a] - popTerm[b]) + wComp * (compA + compB - compTerm[a] - compTerm[b]) + wTens * (tensA + tensB - tensTerm[a] - tensTerm[b]);
+        if (wElec != 0) {
+            SeatBands.replaceTwo(sorted, k, share[a], share[b], shareOf(dem[a] - dd, rep[a] - dr), shareOf(dem[b] + dd, rep[b] + dr), scratch);
+            delta += wElec * (SeatBands.penaltySorted(scratch, k, demSeats, hi, lo) - elecPen);
+        }
+        return delta / k;
     }
     
     private void nextBlock() {

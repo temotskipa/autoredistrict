@@ -429,12 +429,11 @@ public final class App extends Application {
             }
         };
         t.setOnSucceeded(e -> {
-            setRunning(false);
-            refreshStates();
+            afterImport(states);
             statusLabel.setText("Imported " + states.size() + " state(s) from " + dir);
         });
         t.setOnFailed(e -> {
-            setRunning(false);
+            afterImport(states);
             fail("Import failed", t.getException());
         });
         setRunning(true);
@@ -443,6 +442,19 @@ public final class App extends Application {
         Thread.ofPlatform().daemon().name("import").start(t);
     }
     
+    /**
+     * The import may have replaced the selected state's cache (even one that then failed part
+     * way), so that state is loaded again, which also drops a result made from the old data.
+     */
+    private void afterImport(List<StateInfo> states) {
+        setRunning(false);
+        refreshStates();
+        StateInfo selected = stateBox.getValue();
+        if (selected != null && states.contains(selected)) {
+            loadState(selected);
+        }
+    }
+
     private void startSnapshot() {
         StateInfo s = States.require(opts.snapshotState());
         if (!stateBox.getItems().contains(s)) {

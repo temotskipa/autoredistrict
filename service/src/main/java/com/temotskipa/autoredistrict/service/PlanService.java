@@ -29,8 +29,9 @@ public record PlanService(Path cacheRoot) {
     }
     
     /**
-     * Like {@link #run} but stops the other chains as soon as one hits the target within the
-     * population tolerance (used by seat-range).
+     * Like {@link #run} but stops at the first chain in seed order that hits the target within the
+     * population tolerance, once the chains before it have finished, and cancels the rest (used by
+     * seat-range). The plan is that chain's, so it is the same on every run with the same seed.
      */
     public PlanResult runUntilHit(StateDataset ds, PlanOptions o, Listener listener) throws InterruptedException {
         return run(ds, o, listener, true);
