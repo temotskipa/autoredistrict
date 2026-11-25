@@ -158,7 +158,25 @@ class GeometryTest {
         assertEquals(10.0, lengths.get(AdjacencyBuilder.pairKey(0, 2)), 1e-9);
         assertEquals(10.0, lengths.get(AdjacencyBuilder.pairKey(1, 2)), 1e-9);
     }
-    
+
+    @Test
+    void aBorderThatIsOnlyPartlyHashedIsMeasuredInFull() {
+        // A and B share the top edge of A, 20 long. From x=10 to 20 both have the same segment;
+        // from 0 to 10 B has an extra vertex at x=5, 4 mm off A's edge, so nothing there hashes.
+        Geometry a = Fixtures.poly(0, 0, 20, 0, 20, 10, 10, 10, 0, 10);
+        Geometry b = Fixtures.poly(0, 10, 5, 10.004, 10, 10, 20, 10, 20, 20, 0, 20);
+        AdjacencyBuilder.Adjacency adj = AdjacencyBuilder.build(List.of(a, b), List.of(a, b));
+        assertEquals(1, adj.edgeCount());
+        assertEquals(1, adj.hashedPairs());
+        assertEquals(1, adj.fallbackPairs(), "the unhashed half is counted");
+        assertEquals(20.0, edges(adj).get(AdjacencyBuilder.pairKey(0, 1)), 1e-5);
+        assertEquals(40.0, adj.outer()[0], 1e-5, "A's outer boundary is its bottom and sides");
+        // A neighbour 1 m away across a gap shares nothing.
+        Geometry c = Fixtures.box(0, -11, 20, -1);
+        AdjacencyBuilder.Adjacency gap = AdjacencyBuilder.build(List.of(a, c), List.of(a, c));
+        assertEquals(0, gap.edgeCount());
+    }
+
     @Test
     void islandsAreLinkedToTheirNearestNeighbour() {
         List<Geometry> geoms = List.of(Fixtures.box(0, 0, 10, 10), Fixtures.box(10, 0, 20, 10), Fixtures.box(50, 0, 60, 10), Fixtures.box(26, 30, 30, 34), Fixtures.box(80, 80, 90, 90));
