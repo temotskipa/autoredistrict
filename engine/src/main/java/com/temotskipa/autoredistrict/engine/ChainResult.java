@@ -19,8 +19,4 @@ public record ChainResult(int chain, long seed, int[] assignment, double score, 
     public boolean hit() {
         return demWon == demTarget;
     }
-    
-    public double flipsPerSecond() {
-        return seconds > 0 ? proposals / seconds : 0;
-    }
 }

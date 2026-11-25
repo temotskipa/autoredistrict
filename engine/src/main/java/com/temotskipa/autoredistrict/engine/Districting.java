@@ -909,10 +909,6 @@ public final class Districting {
         return assign.clone();
     }
     
-    public int boundarySize() {
-        return bsize;
-    }
-    
     /**
      * Districts with a D share above 50%.
      */
@@ -957,10 +953,6 @@ public final class Districting {
         return true;
     }
     
-    public double idealPopulation() {
-        return ideal;
-    }
-    
     public Graph graph() {
         return g;
     }
@@ -994,12 +986,8 @@ public final class Districting {
         }
     }
     
-    // Test hooks.
-    
-    double[] sharesCopy() {
-        return share.clone();
-    }
-    
+    // Test hook.
+
     long populationOf(int d) {
         return pop[d];
     }

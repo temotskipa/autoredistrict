@@ -10,8 +10,4 @@ public value record Edge(int a, int b, double sharedLength) {
             throw new IllegalArgumentException("self loop");
         }
     }
-    
-    public boolean isBridge() {
-        return sharedLength == 0;
-    }
 }

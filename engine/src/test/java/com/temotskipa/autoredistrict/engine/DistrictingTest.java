@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.SplittableRandom;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class DistrictingTest {
@@ -68,7 +69,7 @@ class DistrictingTest {
     @Test
     void populationBoundIsHardOnceADistrictIsInside() {
         // 10x10 grid split into two 5-column halves: both exactly at ideal (500 each of 1000).
-        Graph g = Grids.lattice(10, 10, 10, i -> 0.5);
+        Graph g = Grids.lattice(10, 10, 10, _ -> 0.5);
         int[] init = new int[100];
         for (int i = 0; i < 100; i++) {
             init[i] = (i % 10) < 5 ? 0 : 1;
@@ -109,7 +110,7 @@ class DistrictingTest {
     void pruningMoveTakesAOneTractWideTailAlong() {
         // District 0: the left half plus a tail along the top row to the right edge (like El Paso's
         // tail into Reeves County). Flipping the tail's first cell alone would cut the rest off.
-        Graph g = Grids.lattice(10, 10, 10, i -> 0.5);
+        Graph g = Grids.lattice(10, 10, 10, _ -> 0.5);
         int[] init = new int[100];
         for (int i = 0; i < 100; i++) {
             int r = i / 10;
@@ -119,8 +120,8 @@ class DistrictingTest {
         Districting d = new Districting(g, 2, init, 10);
         d.setWeights(new Weights(1, 0, 0, 0));
         int neck = 9 * 10 + 5; // top row, first tail cell
-        assertTrue(!Double.isNaN(d.evaluate(neck, 1)));
-        assertTrue(!d.removalKeepsConnected(neck), "the neck is a cut vertex");
+        assertFalse(Double.isNaN(d.evaluate(neck, 1)));
+        assertFalse(d.removalKeepsConnected(neck), "the neck is a cut vertex");
         assertTrue(d.cutsOffSmallPiece(neck), "and the tail is small");
         assertTrue(d.tryPieceMove(neck, 1, 1e9, new SplittableRandom(1)), "neck and tail move together");
         int[] a = d.assignment();
@@ -139,10 +140,10 @@ class DistrictingTest {
         e.setWeights(new Weights(1, 0, 0, 0));
         int neck2 = 9 * 10 + 4;
         e.evaluate(neck2, 1);
-        assertTrue(!e.removalKeepsConnected(neck2));
+        assertFalse(e.removalKeepsConnected(neck2));
         assertTrue(e.cutsOffSmallPiece(neck2));
         double before = e.score();
-        assertTrue(!e.tryPieceMove(neck2, 1, 1e-30, new SplittableRandom(1)), "worse move rejected");
+        assertFalse(e.tryPieceMove(neck2, 1, 1e-30, new SplittableRandom(1)), "worse move rejected");
         assertEquals(java.util.Arrays.toString(small), java.util.Arrays.toString(e.assignment()));
         assertEquals(before, e.score(), 1e-9 * Math.max(1, Math.abs(before)));
         e.verifyTallies();
@@ -153,7 +154,7 @@ class DistrictingTest {
         // The tail layout above, scored on surface tension only: flipping the neck alone lengthens
         // the border between the districts, taking the tail along shortens it. Only the whole
         // move's score change may decide, so it is accepted even when cold.
-        Graph g = Grids.lattice(10, 10, 10, i -> 0.5);
+        Graph g = Grids.lattice(10, 10, 10, _ -> 0.5);
         int[] init = new int[100];
         for (int i = 0; i < 100; i++) {
             init[i] = i % 10 < 5 || i / 10 == 9 ? 0 : 1;
@@ -211,15 +212,15 @@ class DistrictingTest {
     @Test
     void aCutVertexBetweenTwoLargeSidesHasNoSmallPiece() {
         // District 0 is two 50-cell halves joined only through the cell at (column 10, row 0).
-        Graph g = Grids.lattice(21, 5, 10, i -> 0.5);
+        Graph g = Grids.lattice(21, 5, 10, _ -> 0.5);
         int[] init = new int[21 * 5];
         for (int i = 0; i < init.length; i++) {
             init[i] = i % 21 == 10 && i / 21 > 0 ? 1 : 0;
         }
         Districting d = new Districting(g, 2, init, 10);
         int bridge = 10;
-        assertTrue(!d.removalKeepsConnected(bridge));
-        assertTrue(!d.cutsOffSmallPiece(bridge), "both sides are over " + Districting.MAX_PIECE + " cells");
-        assertTrue(!d.cutsOffSmallPiece(0), "a corner cell cuts nothing off");
+        assertFalse(d.removalKeepsConnected(bridge));
+        assertFalse(d.cutsOffSmallPiece(bridge), "both sides are over " + Districting.MAX_PIECE + " cells");
+        assertFalse(d.cutsOffSmallPiece(0), "a corner cell cuts nothing off");
     }
 }

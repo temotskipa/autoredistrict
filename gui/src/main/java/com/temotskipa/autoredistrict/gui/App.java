@@ -104,7 +104,7 @@ public final class App extends Application {
         Scene scene = new Scene(root, 1360, 900);
         stage.setTitle("autoredistrict — seat-targeted congressional maps");
         stage.setScene(scene);
-        stage.setOnShown(e -> {
+        stage.setOnShown(_ -> {
             long ms = Duration.between(ProcessHandle.current().info().startInstant().orElse(Instant.now()), Instant.now()).toMillis();
             System.out.printf(Locale.ROOT, "first window shown %d ms after JVM start%n", ms);
             if (opts.exitAfterShow()) {
@@ -121,15 +121,15 @@ public final class App extends Application {
     private VBox controls() {
         stateBox.setPromptText("Imported states");
         stateBox.setMaxWidth(Double.MAX_VALUE);
-        stateBox.setCellFactory(l -> new StateCell());
+        stateBox.setCellFactory(_ -> new StateCell());
         stateBox.setButtonCell(new StateCell());
-        stateBox.valueProperty().addListener((o, a, s) -> {
+        stateBox.valueProperty().addListener((_, _, s) -> {
             if (s != null) {
                 loadState(s);
             }
         });
         electionBox.setValue("2024");
-        electionBox.valueProperty().addListener((o, a, b) -> {
+        electionBox.valueProperty().addListener((_, _, _) -> {
             if (stateBox.getValue() != null) {
                 loadState(stateBox.getValue());
             }
@@ -153,7 +153,7 @@ public final class App extends Application {
         form.addRow(r++, new Label("Democratic seats"), demSpinner);
         form.add(demRange, 1, r++);
         form.addRow(r++, new Label("Min margin (pts)"), marginSpinner);
-        form.addRow(r++, new Label("Seeds"), seedsSpinner);
+        form.addRow(r, new Label("Seeds"), seedsSpinner);
         GridPane.setHgrow(stateBox, Priority.ALWAYS);
         demRange.getStyleClass().add("text-muted");
         
@@ -162,8 +162,8 @@ public final class App extends Application {
         runButton.setMaxWidth(Double.MAX_VALUE);
         cancelButton.setMaxWidth(Double.MAX_VALUE);
         cancelButton.setDisable(true);
-        runButton.setOnAction(e -> run());
-        cancelButton.setOnAction(e -> {
+        runButton.setOnAction(_ -> run());
+        cancelButton.setOnAction(_ -> {
             if (running != null) {
                 running.cancel(true); // interrupts the run, which cancels the chains' structured scope
             }
@@ -182,10 +182,10 @@ public final class App extends Application {
         progressBar.setMaxWidth(Double.MAX_VALUE);
         
         importButton.setMaxWidth(Double.MAX_VALUE);
-        importButton.setOnAction(e -> importFiles());
-        pngButton.setOnAction(e -> export("png"));
-        geoJsonButton.setOnAction(e -> export("geojson"));
-        csvButton.setOnAction(e -> export("csv"));
+        importButton.setOnAction(_ -> importFiles());
+        pngButton.setOnAction(_ -> export("png"));
+        geoJsonButton.setOnAction(_ -> export("geojson"));
+        csvButton.setOnAction(_ -> export("csv"));
         HBox exports = new HBox(6, pngButton, geoJsonButton, csvButton);
         setExportsDisabled(true);
         
@@ -247,13 +247,12 @@ public final class App extends Application {
             @Override
             protected StateDataset call() {
                 StateDataset ds = service.load(s, election);
-                ds.geometry();
-                ds.graph();
+                ds.preload();
                 return ds;
             }
         };
         loading = t;
-        t.setOnSucceeded(e -> {
+        t.setOnSucceeded(_ -> {
             if (t != loading) {
                 return;
             }
@@ -285,7 +284,7 @@ public final class App extends Application {
                 run();
             }
         });
-        t.setOnFailed(e -> {
+        t.setOnFailed(_ -> {
             if (t == loading) {
                 loading = null;
                 fail("Could not load " + s.abbr(), t.getException());
@@ -300,6 +299,46 @@ public final class App extends Application {
         }
         PlanOptions o = PlanOptions.defaults().withDemSeats(demSpinner.getValue()).withMargin(marginSpinner.getValue()).withSeeds(seedsSpinner.getValue());
         StateDataset ds = dataset;
+        Task<PlanResult> t = planTask(ds, o);
+        t.setOnSucceeded(_ -> {
+            running = null;
+            setRunning(false);
+            // The selectors are locked during a run, but if the selection changed anyway the
+            // result belongs to another dataset than the one on screen: drop it.
+            if (ds != dataset) {
+                phaseLabel.setText("done (selection changed; result discarded)");
+                return;
+            }
+            showResult(t.getValue(), ds);
+            progressBar.setProgress(1);
+            if (opts.snapshotState() != null) {
+                // Let the table and map lay out, then capture the whole window.
+                PauseTransition pause = new PauseTransition(javafx.util.Duration.millis(600));
+                pause.setOnFinished(_ -> saveSnapshot());
+                pause.play();
+            }
+        });
+        t.setOnCancelled(_ -> {
+            running = null;
+            setRunning(false);
+            phaseLabel.setText("cancelled");
+            progressBar.setProgress(0);
+        });
+        t.setOnFailed(_ -> {
+            running = null;
+            setRunning(false);
+            fail("The run failed", t.getException());
+        });
+        running = t;
+        setRunning(true);
+        phaseLabel.setText("starting");
+        Thread.ofPlatform().daemon().name("plan-run").start(t);
+    }
+    
+    /**
+     * The run as a background task. Progress updates the live labels at most every 100 ms.
+     */
+    private Task<PlanResult> planTask(StateDataset ds, PlanOptions o) {
         Map<Integer, Double> fps = new ConcurrentHashMap<>();
         AtomicLong lastUi = new AtomicLong();
         Progress.Listener listener = p -> {
@@ -318,45 +357,12 @@ public final class App extends Application {
                 });
             }
         };
-        Task<PlanResult> t = new Task<>() {
+        return new Task<>() {
             @Override
             protected PlanResult call() throws Exception {
                 return service.run(ds, o, listener);
             }
         };
-        t.setOnSucceeded(e -> {
-            running = null;
-            setRunning(false);
-            // The selectors are locked during a run, but if the selection changed anyway the
-            // result belongs to another dataset than the one on screen: drop it.
-            if (ds != dataset) {
-                phaseLabel.setText("done (selection changed; result discarded)");
-                return;
-            }
-            showResult(t.getValue(), ds);
-            progressBar.setProgress(1);
-            if (opts.snapshotState() != null) {
-                // Let the table and map lay out, then capture the whole window.
-                PauseTransition pause = new PauseTransition(javafx.util.Duration.millis(600));
-                pause.setOnFinished(x -> saveSnapshot());
-                pause.play();
-            }
-        });
-        t.setOnCancelled(e -> {
-            running = null;
-            setRunning(false);
-            phaseLabel.setText("cancelled");
-            progressBar.setProgress(0);
-        });
-        t.setOnFailed(e -> {
-            running = null;
-            setRunning(false);
-            fail("The run failed", t.getException());
-        });
-        running = t;
-        setRunning(true);
-        phaseLabel.setText("starting");
-        Thread.ofPlatform().daemon().name("plan-run").start(t);
     }
     
     private void showResult(PlanResult r, StateDataset ds) {
@@ -422,17 +428,12 @@ public final class App extends Application {
         for (File f : files) {
             States.find(f.getName().substring(0, 2)).ifPresent(states::add);
         }
-        Task<String> t = new Task<>() {
-            @Override
-            protected String call() throws Exception {
-                return ImportService.summaryTable(ImportService.importFolder(dir, states, opts.cacheDir(), 4, msg -> Platform.runLater(() -> statusLabel.setText(msg))));
-            }
-        };
-        t.setOnSucceeded(e -> {
+        Task<String> t = importTask(dir, states);
+        t.setOnSucceeded(_ -> {
             afterImport(states);
             statusLabel.setText("Imported " + states.size() + " state(s) from " + dir);
         });
-        t.setOnFailed(e -> {
+        t.setOnFailed(_ -> {
             afterImport(states);
             fail("Import failed", t.getException());
         });
@@ -440,6 +441,18 @@ public final class App extends Application {
         cancelButton.setDisable(true);
         statusLabel.setText("Importing " + states.size() + " state(s)…");
         Thread.ofPlatform().daemon().name("import").start(t);
+    }
+    
+    /**
+     * The import as a background task that reports each step in the status line.
+     */
+    private Task<String> importTask(Path dir, List<StateInfo> states) {
+        return new Task<>() {
+            @Override
+            protected String call() throws Exception {
+                return ImportService.summaryTable(ImportService.importFolder(dir, states, opts.cacheDir(), 4, msg -> Platform.runLater(() -> statusLabel.setText(msg))));
+            }
+        };
     }
     
     /**
@@ -454,7 +467,7 @@ public final class App extends Application {
             loadState(selected);
         }
     }
-
+    
     private void startSnapshot() {
         StateInfo s = States.require(opts.snapshotState());
         if (!stateBox.getItems().contains(s)) {
@@ -481,7 +494,7 @@ public final class App extends Application {
             MapRenderer.writePng(out, file);
             System.out.printf(Locale.ROOT, "snapshot %dx%d written to %s; %s requested %d D, won %d D-%d R (%s)%n", w, h, file, result.state().abbr(), result.demRequested(), result.metrics().demWon(), result.metrics().repWon(), result.hit() ? "hit" : "miss");
         } catch (RuntimeException e) {
-            e.printStackTrace();
+            System.err.println("Could not write the snapshot: " + e);
             Platform.exit();
             System.exit(1);
         }

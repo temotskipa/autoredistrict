@@ -20,7 +20,6 @@ public final class Graph {
     private final double[] x;
     private final double[] y;
     private final double[] area;
-    private final double[] outer;
     private final int[] offsets;
     private final int[] neighbors;
     private final double[] edgeLength;
@@ -28,7 +27,7 @@ public final class Graph {
     private final double totalArea;
     private final int maxDegree;
     
-    private Graph(int[] pop, double[] dem, double[] rep, double[] x, double[] y, double[] area, double[] outer, int[] offsets, int[] neighbors, double[] edgeLength) {
+    private Graph(int[] pop, double[] dem, double[] rep, double[] x, double[] y, double[] area, int[] offsets, int[] neighbors, double[] edgeLength) {
         this.n = pop.length;
         this.pop = pop;
         this.dem = dem;
@@ -36,7 +35,6 @@ public final class Graph {
         this.x = x;
         this.y = y;
         this.area = area;
-        this.outer = outer;
         this.offsets = offsets;
         this.neighbors = neighbors;
         this.edgeLength = edgeLength;
@@ -57,9 +55,9 @@ public final class Graph {
      * Builds a graph from per-unit arrays and an undirected edge list. Duplicate edges are merged
      * (lengths summed) and self loops are rejected.
      */
-    public static Graph of(int[] pop, double[] dem, double[] rep, double[] x, double[] y, double[] area, double[] outer, int[] edgeA, int[] edgeB, double[] edgeLen) {
+    public static Graph of(int[] pop, double[] dem, double[] rep, double[] x, double[] y, double[] area, int[] edgeA, int[] edgeB, double[] edgeLen) {
         int n = pop.length;
-        for (double[] arr : new double[][]{dem, rep, x, y, area, outer}) {
+        for (double[] arr : new double[][]{dem, rep, x, y, area}) {
             if (arr.length != n) {
                 throw new IllegalArgumentException("per-unit arrays must all have length " + n);
             }
@@ -115,7 +113,7 @@ public final class Graph {
             }
         }
         outOff[n] = w;
-        return new Graph(pop.clone(), dem.clone(), rep.clone(), x.clone(), y.clone(), area.clone(), outer.clone(), outOff, Arrays.copyOf(nbr, w), Arrays.copyOf(len, w));
+        return new Graph(pop.clone(), dem.clone(), rep.clone(), x.clone(), y.clone(), area.clone(), outOff, Arrays.copyOf(nbr, w), Arrays.copyOf(len, w));
     }
     
     private static void sortPairs(int[] keys, double[] vals, int from, int to) {
@@ -161,17 +159,6 @@ public final class Graph {
         return area[i];
     }
     
-    /**
-     * Length of the unit's boundary that borders no other unit (coast, state line).
-     */
-    public double outer(int i) {
-        return outer[i];
-    }
-    
-    public int degree(int i) {
-        return offsets[i + 1] - offsets[i];
-    }
-    
     public int maxDegree() {
         return maxDegree;
     }
@@ -182,22 +169,6 @@ public final class Graph {
     
     public double totalArea() {
         return totalArea;
-    }
-    
-    public double totalDem() {
-        double s = 0;
-        for (double d : dem) {
-            s += d;
-        }
-        return s;
-    }
-    
-    public double totalRep() {
-        double s = 0;
-        for (double r : rep) {
-            s += r;
-        }
-        return s;
     }
     
     /**
@@ -237,35 +208,5 @@ public final class Graph {
      */
     public double[] edgeLengthsOf(int i) {
         return Arrays.copyOfRange(edgeLength, offsets[i], offsets[i + 1]);
-    }
-    
-    /**
-     * Labels connected components; returns the number of components.
-     */
-    public int components(int[] label) {
-        Arrays.fill(label, -1);
-        int[] queue = new int[n];
-        int c = 0;
-        for (int s = 0; s < n; s++) {
-            if (label[s] >= 0) {
-                continue;
-            }
-            int head = 0;
-            int tail = 0;
-            queue[tail++] = s;
-            label[s] = c;
-            while (head < tail) {
-                int u = queue[head++];
-                for (int e = offsets[u]; e < offsets[u + 1]; e++) {
-                    int v = neighbors[e];
-                    if (label[v] < 0) {
-                        label[v] = c;
-                        queue[tail++] = v;
-                    }
-                }
-            }
-            c++;
-        }
-        return c;
     }
 }

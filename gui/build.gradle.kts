@@ -15,7 +15,7 @@ val javafxPlatform: String = providers.gradleProperty("javafx.platform").orNull 
 }
 
 dependencies {
-	implementation(project(":service"))
+	implementation(project(":core"))
 	implementation(variantOf(libs.javafx.base) { classifier(javafxPlatform) })
 	implementation(variantOf(libs.javafx.graphics) { classifier(javafxPlatform) })
 	implementation(variantOf(libs.javafx.controls) { classifier(javafxPlatform) })
@@ -43,8 +43,8 @@ tasks.named<CreateStartScripts>("startScripts") {
 		unixScript.writeText(
 			unixScript.readText().replaceFirst(
 				"# Determine the Java command to use",
-				"if [ -f \"\$APP_HOME/lib/gui.aot\" ]; then\n" +
-						"    DEFAULT_JVM_OPTS=\"\$DEFAULT_JVM_OPTS \\\"-XX:AOTCache=\$APP_HOME/lib/gui.aot\\\"\"\n" +
+				$$"if [ -f \"$APP_HOME/lib/gui.aot\" ]; then\n" +
+						$$"    DEFAULT_JVM_OPTS=\"$DEFAULT_JVM_OPTS \\\"-XX:AOTCache=$APP_HOME/lib/gui.aot\\\"\"\n" +
 						"fi\n\n# Determine the Java command to use",
 			)
 		)

@@ -16,8 +16,4 @@ public record Schedule(List<Phase> phases, long extraSteps, Duration timeBudget)
             throw new IllegalArgumentException("a schedule needs at least one phase");
         }
     }
-    
-    public long totalSteps() {
-        return phases.stream().mapToLong(Phase::steps).sum();
-    }
 }

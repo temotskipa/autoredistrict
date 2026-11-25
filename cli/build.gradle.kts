@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-	implementation(project(":service"))
+	implementation(project(":core"))
 	implementation(libs.picocli)
 }
 

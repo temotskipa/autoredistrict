@@ -31,13 +31,13 @@ public final class Main implements Runnable {
     @Option(names = "--cache-dir", description = "Cache folder (default: .cache).", defaultValue = ".cache", scope = ScopeType.INHERIT)
     Path cacheDir;
     
-    static void main(String[] args) {
+    void main(String[] args) {
         System.exit(run(args));
     }
     
     public static int run(String... args) {
         CommandLine cl = new CommandLine(new Main());
-        cl.setExecutionExceptionHandler((ex, cmd, parsed) -> {
+        cl.setExecutionExceptionHandler((ex, cmd, _) -> {
             if (ex instanceof DataException || ex instanceof IllegalArgumentException) {
                 cmd.getErr().println("error: " + ex.getMessage());
                 return 2;

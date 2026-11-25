@@ -2,7 +2,7 @@
  * The JavaFX desktop app, including snapshot mode.
  */
 module com.temotskipa.autoredistrict.gui {
-    requires com.temotskipa.autoredistrict.service;
+    requires com.temotskipa.autoredistrict.core;
     requires javafx.controls;
     requires atlantafx.base;
 

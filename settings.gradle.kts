@@ -5,5 +5,5 @@ pluginManagement {
 
 rootProject.name = "autoredistrict"
 
-// engine <- data <- service -> render; cli and gui are the two front ends on top of service.
-include("engine", "data", "render", "service", "cli", "gui")
+// engine <- core; cli and gui are the two front ends on top of core.
+include("engine", "core", "cli", "gui")

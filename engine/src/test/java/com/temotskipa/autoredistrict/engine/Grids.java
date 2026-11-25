@@ -55,7 +55,6 @@ final class Grids {
         double[] x = new double[n];
         double[] y = new double[n];
         double[] area = new double[n];
-        double[] outer = new double[n];
         int edges = (w - 1) * h + w * (h - 1);
         int[] ea = new int[edges];
         int[] eb = new int[edges];
@@ -71,7 +70,6 @@ final class Grids {
                 x[i] = c * CELL;
                 y[i] = r * CELL;
                 area[i] = CELL * CELL;
-                outer[i] = CELL * ((c == 0 ? 1 : 0) + (c == w - 1 ? 1 : 0) + (r == 0 ? 1 : 0) + (r == h - 1 ? 1 : 0));
                 if (c + 1 < w) {
                     ea[m] = i;
                     eb[m] = i + 1;
@@ -84,7 +82,7 @@ final class Grids {
                 }
             }
         }
-        return Graph.of(p, dem, rep, x, y, area, outer, ea, eb, el);
+        return Graph.of(p, dem, rep, x, y, area, ea, eb, el);
     }
     
     /**

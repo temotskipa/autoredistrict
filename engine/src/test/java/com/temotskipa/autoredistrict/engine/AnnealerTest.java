@@ -87,14 +87,14 @@ class AnnealerTest {
         Target t = new Target(4, 2, 2.0, 0.02);
         long[] seeds = Annealer.seeds(1, Annealer.MAX_SEEDS + 1);
         assertThrows(IllegalArgumentException.class, () -> Annealer.runAll(g, t, Grids.schedule(1_000), Grids.BFS_VORONOI, seeds, Progress.Listener.NONE));
-        assertThrows(IllegalArgumentException.class, () -> Annealer.runUntil(g, t, Grids.schedule(1_000), Grids.BFS_VORONOI, seeds, Progress.Listener.NONE, r -> true));
+        assertThrows(IllegalArgumentException.class, () -> Annealer.runUntil(g, t, Grids.schedule(1_000), Grids.BFS_VORONOI, seeds, Progress.Listener.NONE, _ -> true));
         assertEquals(0, chainThreads());
     }
 
     @Test
     void runUntilStopsTheOtherChainsAfterAMatch() throws InterruptedException {
         Graph g = planted();
-        Annealer.Until u = Annealer.runUntil(g, new Target(4, 2, 2.0, 0.02), Grids.schedule(10_000), Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, r -> true);
+        Annealer.Until u = Annealer.runUntil(g, new Target(4, 2, 2.0, 0.02), Grids.schedule(10_000), Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, _ -> true);
         List<ChainResult> rs = u.finished();
         assertEquals(List.of(0), rs.stream().map(ChainResult::chain).toList(), "chain 0 decides, whoever finishes first");
         long finished = rs.stream().mapToLong(ChainResult::proposals).sum();
@@ -116,7 +116,7 @@ class AnnealerTest {
             assertArrayEquals(one.assignment(), u.finished().get(1).assignment(), "run " + run);
         }
         // Nothing accepted: every chain finishes and is returned.
-        Annealer.Until none = Annealer.runUntil(g, t, s, Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, r -> false);
+        Annealer.Until none = Annealer.runUntil(g, t, s, Grids.BFS_VORONOI, Annealer.seeds(9, 3), Progress.Listener.NONE, _ -> false);
         assertEquals(List.of(0, 1, 2), none.finished().stream().map(ChainResult::chain).toList());
     }
 }

@@ -141,20 +141,24 @@ script uses it when present. On the development machine the window appears in ab
 
 ## Layout
 
-Each Gradle project is a named Java module, `com.temotskipa.autoredistrict.<project>`, with one package of the same
-name. Convention plugins (toolchain, preview and launch flags) live in the `build-logic` included build.
+Each Gradle project is a named Java module, `com.temotskipa.autoredistrict.<project>`. Convention plugins (toolchain,
+preview and launch flags) live in the `build-logic` included build.
 
-| Module    | Contents                                                                                                                                                                                  |
-|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `engine`  | Pure Java, no I/O: the `Graph`, the chain state (`Districting`), the single-flip move kernel behind `MoveKernel`, seat-band scoring, the three-phase `Chain` and the parallel `Annealer`. |
-| `data`    | RDH import (GeoTools), the per-state Albers equal-area projection, adjacency, connectivity repair, block votes to tracts, the cache, the 2020 apportionment table.                        |
-| `render`  | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI.                                                                                |
-| `service` | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts. Requires `data` and `render`.                                            |
-| `cli`     | picocli front end.                                                                                                                                                                        |
-| `gui`     | JavaFX front end.                                                                                                                                                                         |
+| Module   | Contents                                                                                                                                                                                  |
+|----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `engine` | Pure Java, no I/O: the `Graph`, the chain state (`Districting`), the single-flip move kernel behind `MoveKernel`, seat-band scoring, the three-phase `Chain` and the parallel `Annealer`. |
+| `core`   | What both front ends share, in three packages (below).                                                                                                                                    |
+| `cli`    | picocli front end.                                                                                                                                                                        |
+| `gui`    | JavaFX front end.                                                                                                                                                                         |
+
+| `core` package | Contents                                                                                                                                                          |
+|----------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `data`         | RDH import (GeoTools), the per-state Albers equal-area projection, adjacency, connectivity repair, block votes to tracts, the cache, the 2020 apportionment table. |
+| `render`       | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI.                                                        |
+| `service`      | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts.                                                  |
 
 Both applications run on the module path (`--module com.temotskipa.autoredistrict.cli/...`), which is what JavaFX
-supports. GeoTools and JTS are automatic modules, so `data` and `render` also require the JDK modules GeoTools uses,
+supports. GeoTools and JTS are automatic modules, so `core` also requires the JDK modules GeoTools uses,
 and the launch adds `--add-modules=ALL-MODULE-PATH` for the explicit modules it needs. A few plain jars without module
 names (ejml, re2j and others GeoTools pulls in) stay on the class path. jlink and jpackage would need every module to be
 explicit, so the apps ship as start scripts.

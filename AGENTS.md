@@ -9,18 +9,19 @@ Elections made-to-order"; README.md describes it.
 
 ## Modules
 
-Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<project>` with one package of the same
-name (`engine` <- `data` <- `service` -> `render`; `cli` and `gui` on top of `service`).
+Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<project>` (`engine` <- `core`; `cli` and
+`gui` on top of `core`). `engine`, `cli` and `gui` each have one package of the same name; `core` has three.
 
 - `engine`: pure Java, no I/O and no GeoTools. `Graph` (CSR adjacency), `Districting` (chain state, incremental
   tallies, contiguity, scoring, the pruning move), `SingleFlip` behind `MoveKernel`, `SeatBands`, `Chain` (phases,
   temperatures, repair), `Annealer` (parallel seeds with `StructuredTaskScope` on platform threads).
-- `data`: `RdhTractImporter` (GeoTools shapefile/CSV reading, GEOID padding, validation), `AlbersProjection`,
-  `AdjacencyBuilder`, `Connectivity`, `BlockVotes`, `TractCache` (`.cache/rdh/<st>/`), `StateDataset`, `StateImporter`,
-  `States` (2020 apportionment).
-- `service`: `PlanService` (run, at-large short cut), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS checks),
-  `SeatRange`, `BatchRunner`, `Artifacts`, `ImportService`. New features belong here, not in a front end.
-- `render`: `MapPainter` over `Canvas2D` (Java2D here, JavaFX in the GUI), `MapRenderer`, `Exporters`.
+- `core`, everything the two front ends share:
+    - package `data`: `RdhTractImporter` (GeoTools shapefile/CSV reading, GEOID padding, validation),
+      `AlbersProjection`, `AdjacencyBuilder`, `Connectivity`, `BlockVotes`, `TractCache` (`.cache/rdh/<st>/`),
+      `StateDataset`, `StateImporter`, `States` (2020 apportionment).
+    - package `service`: `PlanService` (run, at-large short cut), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS
+      checks), `SeatRange`, `BatchRunner`, `Artifacts`, `ImportService`. New features belong here, not in a front end.
+    - package `render`: `MapPainter` over `Canvas2D` (Java2D here, JavaFX in the GUI), `MapRenderer`, `Exporters`.
 - `cli`: `Main` with `import`, `run`, `all`, `seat-range`.
 - `gui`: `Launcher` and `App`, including snapshot mode.
 
@@ -33,10 +34,10 @@ name (`engine` <- `data` <- `service` -> `render`; `cli` and `gui` on top of `se
   add them per module.
 - JPMS: every module has a `module-info.java`; the apps run on the module path. A new dependency needs a `requires`
   (and `opens` if it reflects on our classes, like Jackson, picocli and JavaFX). Tests have no module-info and run on
-  the class path. GeoTools and JTS are automatic modules; `data` and `render` list the JDK modules GeoTools needs.
+  the class path. GeoTools and JTS are automatic modules; `core` lists the JDK modules GeoTools needs.
 - Java conventions: standard Java naming, 4-space indents, no wildcard imports in new code, `value record` for small
   immutable types, records for data carriers, primitive arrays in the engine's hot loop (no allocation per step).
-- Keep front ends thin. Logic shared by the GUI and the CLI goes in `service`.
+- Keep front ends thin. Logic shared by the GUI and the CLI goes in `core`'s `service` package.
 - Handle file and parsing errors explicitly with messages that say what to do (`DataException`).
 - Don't commit generated data: `.cache/`, `out/`, `build/` and `*.aot` are ignored.
 - Runs must stay deterministic for a given seed (no time-dependent behaviour except the time budget).

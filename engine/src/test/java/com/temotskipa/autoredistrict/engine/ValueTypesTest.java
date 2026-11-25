@@ -27,7 +27,7 @@ class ValueTypesTest {
         assertSame(new Edge(1, 2, 30.0), new Edge(1, 2, 30.0));
         assertSame(new Target(14, 7, 2.0, 0.01), new Target(14, 7, 2.0, 0.01));
         BoundingBox box = BoundingBox.EMPTY.include(0, 0).include(10, 5);
-        assertSame(box, new BoundingBox(0, 0, 10, 5));
+        assertSame(new BoundingBox(0, 0, 10, 5), box);
         assertEquals(new Point(5, 2.5), box.center());
         assertEquals(5.0, new Point(0, 0).distance(new Point(3, 4)), 1e-12);
     }

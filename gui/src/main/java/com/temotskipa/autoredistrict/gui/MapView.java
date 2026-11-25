@@ -4,7 +4,6 @@ import com.temotskipa.autoredistrict.render.MapData;
 import com.temotskipa.autoredistrict.render.MapPainter;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
-import javafx.scene.input.MouseButton;
 import javafx.scene.layout.Pane;
 import org.locationtech.jts.geom.Envelope;
 import org.locationtech.jts.geom.Geometry;
@@ -31,8 +30,8 @@ final class MapView extends Pane {
         getChildren().add(canvas);
         setStyle("-fx-background-color: #f7f7f5;");
         setMinSize(300, 300);
-        widthProperty().addListener((o, a, b) -> resize());
-        heightProperty().addListener((o, a, b) -> resize());
+        widthProperty().addListener((_, _, _) -> resize());
+        heightProperty().addListener((_, _, _) -> resize());
         setOnScroll(e -> {
             if (viewport != null) {
                 double f = Math.pow(1.0015, e.getDeltaY());
@@ -122,7 +121,7 @@ final class MapView extends Pane {
             return;
         }
         if (plan != null) {
-            double label = Math.max(11, Math.min(18, 260.0 / Math.sqrt(Math.max(1, plan.districts()))));
+            double label = Math.clamp(260.0 / Math.sqrt(Math.max(1, plan.districts())), 11, 18);
             MapPainter.paint(c, plan, viewport, true, label);
         }
         else if (tracts != null) {

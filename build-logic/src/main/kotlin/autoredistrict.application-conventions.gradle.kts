@@ -45,8 +45,8 @@ tasks.named<CreateStartScripts>("startScripts") {
 		unixScript.writeText(
 			sh.replaceFirst(
 				"# Determine the Java command to use",
-				"JAVA_HOME=\"\${AUTOREDISTRICT_JAVA_HOME:-$unixHome}\"\n\n# Determine the Java command to use",
-			).replace("__APP_HOME__", "'\"\$APP_HOME\"'")
+				$$"JAVA_HOME=\"${AUTOREDISTRICT_JAVA_HOME:-$$unixHome}\"\n\n# Determine the Java command to use",
+			).replace("__APP_HOME__", $$"'\"$APP_HOME\"'")
 		)
 	}
 }
