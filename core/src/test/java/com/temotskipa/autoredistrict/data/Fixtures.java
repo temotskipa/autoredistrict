@@ -1,24 +1,16 @@
 package com.temotskipa.autoredistrict.data;
 
-import org.geotools.api.data.FeatureWriter;
-import org.geotools.api.data.Transaction;
-import org.geotools.api.feature.simple.SimpleFeature;
-import org.geotools.api.feature.simple.SimpleFeatureType;
-import org.geotools.data.shapefile.ShapefileDataStore;
-import org.geotools.data.shapefile.ShapefileDataStoreFactory;
-import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
-import org.geotools.referencing.CRS;
-import org.locationtech.jts.geom.*;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.GeometryFactory;
+import org.locationtech.jts.geom.Polygon;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -64,40 +56,19 @@ final class Fixtures {
      * Writes a shapefile with GEOID20, NAME and (optionally) P0010001 into {@code folder/name.shp}.
      */
     static void shapefile(Path folder, String name, List<Tract> tracts, boolean withCounts) throws Exception {
-        Files.createDirectories(folder);
-        var b = new SimpleFeatureTypeBuilder();
-        b.setName(name);
-        b.setCRS(CRS.parseWKT(AlbersProjection.NAD83_ESRI));
-        b.add("the_geom", MultiPolygon.class);
-        b.length(15).add("GEOID20", String.class);
-        b.length(40).add("NAME", String.class);
+        List<Shapefile.Field> fields = new ArrayList<>(List.of(Shapefile.Field.text("GEOID20", 15), Shapefile.Field.text("NAME", 40)));
         if (withCounts) {
-            b.add("P0010001", Long.class);
+            fields.add(Shapefile.Field.number("P0010001", 19, 0));
         }
-        SimpleFeatureType type = b.buildFeatureType();
-        Path shp = folder.resolve(name + ".shp");
-        Map<String, Serializable> params = new HashMap<>();
-        params.put("url", shp.toUri().toURL());
-        params.put("create spatial index", Boolean.FALSE);
-        ShapefileDataStore ds = (ShapefileDataStore) new ShapefileDataStoreFactory().createNewDataStore(params);
-        try {
-            ds.createSchema(type);
-            try (FeatureWriter<SimpleFeatureType, SimpleFeature> w = ds.getFeatureWriterAppend(Transaction.AUTO_COMMIT)) {
-                for (Tract t : tracts) {
-                    SimpleFeature f = w.next();
-                    Geometry g = t.geometry() instanceof Polygon p ? GF.createMultiPolygon(new Polygon[]{p}) : t.geometry();
-                    f.setAttribute("the_geom", g);
-                    f.setAttribute("GEOID20", t.geoid());
-                    f.setAttribute("NAME", t.name());
-                    if (withCounts) {
-                        f.setAttribute("P0010001", t.pop());
-                    }
-                    w.write();
-                }
+        List<Shapefile.Feature> features = new ArrayList<>();
+        for (Tract t : tracts) {
+            List<Object> values = new ArrayList<>(List.of(t.geoid(), t.name()));
+            if (withCounts) {
+                values.add(t.pop());
             }
-        } finally {
-            ds.dispose();
+            features.add(new Shapefile.Feature(t.geometry(), values));
         }
+        Shapefile.write(folder.resolve(name + ".shp"), AlbersProjection.NAD83_ESRI, fields, features);
     }
     
     /**

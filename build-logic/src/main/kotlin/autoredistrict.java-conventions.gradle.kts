@@ -1,5 +1,6 @@
 plugins {
 	`java-library`
+	id("org.gradlex.extra-java-module-info")
 }
 
 val libs = the<VersionCatalogsExtension>().named("libs")
@@ -9,15 +10,15 @@ group = "com.temotskipa.autoredistrict"
 
 repositories {
 	mavenCentral()
-	maven {
-		name = "osgeo"
-		url = uri("https://repo.osgeo.org/repository/release/")
-		// GeoTools and the few of its dependencies that aren't on Maven Central.
-		content {
-			includeGroupByRegex("org[.]geotools.*")
-			includeGroup("it.geosolutions.jgridshift")
-			includeGroup("org.apache.xml")
-		}
+}
+
+// JTS is published without a module-info, which makes it an automatic module, and jlink only links
+// explicit modules. This adds one to its jar on every class path; every other dependency is a module.
+extraJavaModuleInfo {
+	module("org.locationtech.jts:jts-core", "org.locationtech.jts") {
+		exportAllPackages()
+		// Its awt and util packages draw with java.awt.
+		requires("java.desktop")
 	}
 }
 
@@ -30,11 +31,7 @@ java {
 tasks.withType<JavaCompile>().configureEach {
 	options.encoding = "UTF-8"
 	options.release = 28
-	// GeoTools and JTS are automatic modules; requiring them is deliberate, so those lints stay off.
-	options.compilerArgs.addAll(
-		JvmFlags.preview +
-				listOf("-Xlint:all,-preview,-serial,-processing,-this-escape,-requires-automatic,-requires-transitive-automatic")
-	)
+	options.compilerArgs.addAll(JvmFlags.preview + listOf("-Xlint:all,-preview,-serial,-processing,-this-escape"))
 }
 
 // Tests have no module-info, so they run on the class path (white-box, the main module-info is ignored).

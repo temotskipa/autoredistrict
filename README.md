@@ -57,6 +57,37 @@ state gets the same effort per tract. Texas (6,896 tracts, 38 seats) takes about
 The start scripts in `cli\build\install\autoredistrict\bin` and `gui\build\install\autoredistrict-gui\bin` run on the
 JDK 28 toolchain path recorded at build time; set `AUTOREDISTRICT_JAVA_HOME` to use another JDK 28.
 
+To run without an installed JDK, package the apps:
+
+```powershell
+.\gradlew.bat :cli:jpackageImage :gui:jpackageImage
+```
+
+`jlinkImage` links each app's modules and the JDK modules they need into a runtime image with the launch flags built
+in (`build\jlink`, about 52 MB for the CLI and 61 MB for the GUI); `jpackageImage` wraps it as a native app folder
+(`cli\build\jpackage\autoredistrict\autoredistrict.exe`, `gui\build\jpackage\autoredistrict-gui\autoredistrict-gui.exe`).
+
+Installers come from `jpackageInstaller`: an MSI on Windows, a dmg on macOS and a deb on Linux (`-PinstallerType=exe`,
+`pkg` or `rpm` for another type, `-PappVersion=1.2` for the version, 1.0 by default). On Windows it needs the WiX
+toolset on the PATH: WiX 3.14, or WiX 4 or later with its UI and Util extensions, for example
+
+```powershell
+dotnet tool install --global wix
+```
+
+then, in a new terminal, `wix eula accept wix7` (WiX 7's Open Source Maintenance Fee EULA) and
+`wix extension add --global WixToolset.UI.wixext/7.0.1` and `WixToolset.Util.wixext/7.0.1` (the version `wix --version`
+shows). Then
+
+```powershell
+.\gradlew.bat :cli:jpackageInstaller :gui:jpackageInstaller
+```
+
+writes `cli\build\installer\autoredistrict-1.0.msi` and `gui\build\installer\autoredistrict-gui-1.0.msi`. Both install
+for the current user without administrator rights (in `%LOCALAPPDATA%` unless you pick another folder); the GUI adds a
+Start menu entry and a desktop shortcut. The installed CLI isn't put on the PATH. The packaged apps use `.cache` and
+`out` in the folder they start in, like the start scripts.
+
 ## Data: two manual downloads
 
 census.gov blocks some regions (Cloudflare 403), so all geography and votes come from the
@@ -151,17 +182,16 @@ preview and launch flags) live in the `build-logic` included build.
 | `cli`    | picocli front end.                                                                                                                                                                        |
 | `gui`    | JavaFX front end.                                                                                                                                                                         |
 
-| `core` package | Contents                                                                                                                                                           |
-|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `data`         | RDH import (GeoTools), the per-state Albers equal-area projection, adjacency, connectivity repair, block votes to tracts, the cache, the 2020 apportionment table. |
-| `render`       | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI.                                                         |
-| `service`      | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts.                                                   |
+| `core` package | Contents                                                                                                                                                                         |
+|----------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `data`         | RDH import from shapefiles and CSVs, the per-state Albers equal-area projection, adjacency, connectivity repair, block votes to tracts, the cache, the 2020 apportionment table. |
+| `render`       | Java2D PNGs, the contact sheet, GeoJSON, shapefile and CSV export; the map painter is shared with the GUI.                                                                       |
+| `service`      | Plan requests, the graph-Voronoi start, schedules, metrics and PASS checks, the batch, seat-range and artifacts.                                                                 |
 
 Both applications run on the module path (`--module com.temotskipa.autoredistrict.cli/...`), which is what JavaFX
-supports. GeoTools and JTS are automatic modules, so `core` also requires the JDK modules GeoTools uses,
-and the launch adds `--add-modules=ALL-MODULE-PATH` for the explicit modules it needs. A few plain jars without module
-names (ejml, re2j and others GeoTools pulls in) stay on the class path. jlink and jpackage would need every module to be
-explicit, so the apps ship as start scripts.
+supports. The dependencies are JTS, Jackson, picocli, JavaFX and AtlantaFX; shapefiles and the Albers projection are
+handled by `core`'s own code. Every dependency is an explicit module, which jlink needs: JTS ships without a
+`module-info`, so the build adds one to its jar (the `extra-java-module-info` plugin in `build-logic`).
 
 The engine's hot loop runs on primitive arrays and allocates nothing. JDK 28 features in use: value classes (JEP 401,
 preview) for small immutable types such as points, bounding boxes, edges, weights, targets and result rows;

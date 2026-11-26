@@ -12,13 +12,14 @@ Elections made-to-order"; README.md describes it.
 Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<project>` (`engine` <- `core`; `cli` and
 `gui` on top of `core`). `engine`, `cli` and `gui` each have one package of the same name; `core` has three.
 
-- `engine`: pure Java, no I/O and no GeoTools. `Graph` (CSR adjacency), `Districting` (chain state, incremental
+- `engine`: pure Java, no I/O. `Graph` (CSR adjacency), `Districting` (chain state, incremental
   tallies, contiguity, scoring, the pruning move), `SingleFlip` behind `MoveKernel`, `SeatBands`, `Chain` (phases,
   temperatures, repair), `Annealer` (parallel seeds with `StructuredTaskScope` on platform threads).
 - `core`, everything the two front ends share:
-	- package `data`: `RdhTractImporter` (GeoTools shapefile/CSV reading, GEOID padding, validation),
-	  `AlbersProjection`, `AdjacencyBuilder`, `Connectivity`, `BlockVotes`, `TractCache` (`.cache/rdh/<st>/`),
-	  `StateDataset`, `StateImporter`, `States` (2020 apportionment).
+	- package `data`: `RdhTractImporter` (RDH zip, shapefile and CSV reading, GEOID padding, validation),
+	  `Shapefile` (polygon shapefiles with dBASE tables, read and written), `AlbersProjection`, `AdjacencyBuilder`,
+	  `Connectivity`, `BlockVotes`, `TractCache` (`.cache/rdh/<st>/`), `StateDataset`, `StateImporter`, `States`
+	  (2020 apportionment).
 	- package `service`: `PlanService` (run, at-large short cut), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS
 	  checks), `SeatRange`, `BatchRunner`, `Artifacts`, `ImportService`. New features belong here, not in a front end.
 	- package `render`: `MapPainter` over `Canvas2D` (Java2D here, JavaFX in the GUI), `MapRenderer`, `Exporters`.
@@ -35,7 +36,8 @@ Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<proje
   add them per module.
 - JPMS: every module has a `module-info.java`; the apps run on the module path. A new dependency needs a `requires`
   (and `opens` if it reflects on our classes, like Jackson, picocli and JavaFX). Tests have no module-info and run on
-  the class path. GeoTools and JTS are automatic modules; `core` lists the JDK modules GeoTools needs.
+  the class path. Every dependency must be an explicit module so jlink can link the apps; JTS gets its `module-info`
+  from the `extraJavaModuleInfo` block in `autoredistrict.java-conventions`.
 - Java conventions: standard Java naming, 4-space indents, `value record` for small immutable types, records for data
   carriers, primitive arrays in the engine's hot loop (no allocation per step).
 - A result with alternatives is a sealed interface over records (`BatchRunner.Outcome`, `StateImporter.ImportResult`),

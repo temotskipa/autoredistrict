@@ -29,6 +29,20 @@ application {
 	applicationDefaultJvmArgs = JvmFlags.gui
 }
 
+// The Windows installer: a per-user install (no administrator rights) in a folder you can choose,
+// with a Start menu entry and a desktop shortcut. The upgrade code stays fixed, so a newer
+// installer replaces an older one.
+if (System.getProperty("os.name").startsWith("Windows")) {
+	tasks.named<Exec>("jpackageInstaller") {
+		args(
+			"--description", "Draws congressional maps that deliver a requested number of Democratic seats",
+			"--win-per-user-install", "--win-dir-chooser",
+			"--win-menu", "--win-menu-group", "autoredistrict", "--win-shortcut",
+			"--win-upgrade-uuid", "f027b5fb-4ff9-4b66-9ec0-e33b6bcabfa1",
+		)
+	}
+}
+
 // AOT cache (JEP 483/514/515): the start script uses lib/gui.aot when it exists. A cache that
 // doesn't exist makes the JVM print errors, so the option is added only if the file is there.
 tasks.named<CreateStartScripts>("startScripts") {

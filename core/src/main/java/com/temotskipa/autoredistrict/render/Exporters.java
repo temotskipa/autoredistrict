@@ -1,15 +1,10 @@
 package com.temotskipa.autoredistrict.render;
 
-import org.geotools.api.data.FeatureWriter;
-import org.geotools.api.data.Transaction;
-import org.geotools.api.feature.simple.SimpleFeature;
-import org.geotools.api.feature.simple.SimpleFeatureType;
-import org.geotools.api.referencing.FactoryException;
-import org.geotools.data.shapefile.ShapefileDataStore;
-import org.geotools.data.shapefile.ShapefileDataStoreFactory;
-import org.geotools.feature.simple.SimpleFeatureTypeBuilder;
-import org.geotools.referencing.CRS;
-import org.locationtech.jts.geom.*;
+import com.temotskipa.autoredistrict.data.Shapefile;
+import org.locationtech.jts.geom.Coordinate;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.LineString;
+import org.locationtech.jts.geom.Polygon;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -17,14 +12,12 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
 /**
@@ -32,6 +25,8 @@ import java.util.function.Function;
  */
 @SuppressWarnings("preview") // LazyConstant is a preview API, used on purpose
 public final class Exporters {
+    
+    private static final List<Shapefile.Field> SHAPEFILE_FIELDS = List.of(Shapefile.Field.number("DISTRICT", 9, 0), Shapefile.Field.number("POP", 19, 0), Shapefile.Field.number("DEV_PCT", 12, 4), Shapefile.Field.number("D_SHARE", 10, 5), Shapefile.Field.text("WINNER", 1), Shapefile.Field.number("MARGIN", 10, 3));
     
     private static final LazyConstant<JsonMapper> JSON = LazyConstant.of(() -> JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build());
     
@@ -100,52 +95,15 @@ public final class Exporters {
      * Writes district polygons as a shapefile in the projected CRS given as WKT.
      */
     public static void shapefile(Path shp, Geometry[] districts, List<DistrictProps> props, String projectedWkt) {
+        List<Shapefile.Feature> features = new ArrayList<>(districts.length);
+        for (int d = 0; d < districts.length; d++) {
+            DistrictProps p = props.get(d);
+            features.add(new Shapefile.Feature(districts[d], List.of(p.district(), p.population(), round(p.deviationPct(), 4), round(p.demShare(), 5), p.winner(), round(p.marginPts(), 3))));
+        }
         try {
-            Files.createDirectories(shp.toAbsolutePath().getParent());
-            var b = new SimpleFeatureTypeBuilder();
-            var name = shp.getFileName().toString().replaceFirst("\\.shp$", "");
-            b.setName(name);
-            b.setCRS(CRS.parseWKT(projectedWkt));
-            b.add("the_geom", MultiPolygon.class);
-            b.add("DISTRICT", Integer.class);
-            b.add("POP", Long.class);
-            b.add("DEV_PCT", Double.class);
-            b.add("D_SHARE", Double.class);
-            b.length(1).add("WINNER", String.class);
-            b.add("MARGIN", Double.class);
-            var type = b.buildFeatureType();
-            Map<String, Serializable> params = new HashMap<>();
-            params.put("url", shp.toUri().toURL());
-            params.put("create spatial index", Boolean.FALSE);
-            ShapefileDataStore ds = (ShapefileDataStore) new ShapefileDataStoreFactory().createNewDataStore(params);
-            try {
-                ds.setCharset(StandardCharsets.UTF_8);
-                ds.createSchema(type);
-                try (FeatureWriter<SimpleFeatureType, SimpleFeature> w = ds.getFeatureWriterAppend(Transaction.AUTO_COMMIT)) {
-                    for (int d = 0; d < districts.length; d++) {
-                        DistrictProps p = props.get(d);
-                        SimpleFeature f = w.next();
-                        Geometry g = districts[d];
-                        if (g instanceof Polygon poly) {
-                            g = g.getFactory().createMultiPolygon(new Polygon[]{poly});
-                        }
-                        f.setAttribute("the_geom", g);
-                        f.setAttribute("DISTRICT", p.district());
-                        f.setAttribute("POP", p.population());
-                        f.setAttribute("DEV_PCT", round(p.deviationPct(), 4));
-                        f.setAttribute("D_SHARE", round(p.demShare(), 5));
-                        f.setAttribute("WINNER", p.winner());
-                        f.setAttribute("MARGIN", round(p.marginPts(), 3));
-                        w.write();
-                    }
-                }
-            } finally {
-                ds.dispose();
-            }
+            Shapefile.write(shp, projectedWkt, SHAPEFILE_FIELDS, features);
         } catch (IOException e) {
             throw new UncheckedIOException("Could not write " + shp, e);
-        } catch (FactoryException e) {
-            throw new IllegalStateException("Bad projection WKT: " + e.getMessage(), e);
         }
     }
     

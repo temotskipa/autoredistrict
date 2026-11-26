@@ -3,21 +3,13 @@
 [versions]
 javafx = "28-ea+12"
 jts = "1.20.0"
-geotools = "35.2"
 picocli = "4.7.7"
 jackson = "3.3.0"
 junit = "6.2.0-M1"
 atlantafx = "3.0.0"
-uom-systems = "2.1"
 
 [libraries]
 jts-core = { module = "org.locationtech.jts:jts-core", version.ref = "jts" }
-gt-shapefile = { module = "org.geotools:gt-shapefile", version.ref = "geotools" }
-gt-referencing = { module = "org.geotools:gt-referencing", version.ref = "geotools" }
-gt-api = { module = "org.geotools:gt-api", version.ref = "geotools" }
-gt-main = { module = "org.geotools:gt-main", version.ref = "geotools" }
-# systems-common declares this module in module-info but only as "provided" in its POM (see core/build.gradle.kts).
-systems-quantity = { module = "systems.uom:systems-quantity", version.ref = "uom-systems" }
 picocli = { module = "info.picocli:picocli", version.ref = "picocli" }
 jackson-databind = { module = "tools.jackson.core:jackson-databind", version.ref = "jackson" }
 # Used by build-logic through findLibrary(), which the IDE does not see.

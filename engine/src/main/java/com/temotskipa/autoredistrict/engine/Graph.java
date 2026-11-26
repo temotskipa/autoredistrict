@@ -197,7 +197,7 @@ public value class Graph {
     }
     
     /**
-     * Neighbour list of unit {@code i} as a fresh array (not for hot loops).
+     * Neighbor list of unit {@code i} as a fresh array (not for hot loops).
      */
     public int[] neighborsOf(int i) {
         return Arrays.copyOfRange(neighbors, offsets[i], offsets[i + 1]);

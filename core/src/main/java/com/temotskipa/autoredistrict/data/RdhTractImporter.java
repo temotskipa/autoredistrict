@@ -1,18 +1,11 @@
 package com.temotskipa.autoredistrict.data;
 
-import org.geotools.api.data.Query;
-import org.geotools.api.data.SimpleFeatureSource;
-import org.geotools.api.feature.simple.SimpleFeature;
-import org.geotools.api.feature.simple.SimpleFeatureType;
-import org.geotools.api.feature.type.AttributeDescriptor;
-import org.geotools.data.shapefile.ShapefileDataStore;
 import org.locationtech.jts.geom.Geometry;
 
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -194,25 +187,10 @@ public final class RdhTractImporter {
     }
     
     private static Layer readShapefile(Path shp) throws IOException {
-        var prj = sibling(shp, ".prj");
-        var prjWkt = prj == null ? null : Files.readString(prj, StandardCharsets.UTF_8).strip();
-        var cpg = sibling(shp, ".cpg");
-        var charset = StandardCharsets.ISO_8859_1;
-        if (cpg != null) {
-            try {
-                charset = Charset.forName(Files.readString(cpg).strip());
-            } catch (IllegalArgumentException ignored) {
-                // Unknown code page name: keep Latin-1.
-            }
-        }
-        var store = new ShapefileDataStore(shp.toUri().toURL());
-        try {
-            store.setCharset(charset);
-            store.setMemoryMapped(false);
-            SimpleFeatureType schema = store.getSchema();
+        try (var file = Shapefile.open(shp)) {
             Map<String, String> columns = new HashMap<>();
-            for (AttributeDescriptor d : schema.getAttributeDescriptors()) {
-                columns.put(d.getLocalName().toUpperCase(Locale.ROOT), d.getLocalName());
+            for (String c : file.columns()) {
+                columns.put(c.toUpperCase(Locale.ROOT), c);
             }
             String geoidCol = firstPresent(columns, GEOID_COLUMNS);
             if (geoidCol == null) {
@@ -220,45 +198,20 @@ public final class RdhTractImporter {
             }
             String nameCol = firstPresent(columns, NAME_COLUMNS);
             String popCol = firstPresent(columns, POP_COLUMNS);
-            String geomCol = schema.getGeometryDescriptor() == null ? null : schema.getGeometryDescriptor().getLocalName();
-            List<String> props = new ArrayList<>(List.of(geoidCol));
-            if (nameCol != null) {
-                props.add(nameCol);
+            List<String> geoids = file.column(geoidCol);
+            if (geoids.contains(null)) {
+                throw new DataException("Some rows have no GEOID.");
             }
+            List<String> names = nameCol == null ? Collections.nCopies(geoids.size(), "") : file.column(nameCol).stream().map(n -> n == null ? "" : n).toList();
+            long[] pop = null;
             if (popCol != null) {
-                props.add(popCol);
-            }
-            if (geomCol != null) {
-                props.add(geomCol);
-            }
-            var query = new Query(schema.getTypeName());
-            query.setPropertyNames(props.toArray(String[]::new));
-            SimpleFeatureSource source = store.getFeatureSource();
-            List<String> geoids = new ArrayList<>();
-            List<String> names = new ArrayList<>();
-            List<Long> pops = new ArrayList<>();
-            List<Geometry> geoms = new ArrayList<>();
-            try (var it = source.getFeatures(query).features()) {
-                while (it.hasNext()) {
-                    SimpleFeature f = it.next();
-                    Object id = f.getAttribute(geoidCol);
-                    if (id == null) {
-                        throw new DataException("Some rows have no GEOID.");
-                    }
-                    geoids.add(id instanceof Number n ? Long.toString(n.longValue()) : id.toString());
-                    names.add(nameCol == null || f.getAttribute(nameCol) == null ? "" : f.getAttribute(nameCol).toString());
-                    if (popCol != null) {
-                        var v = f.getAttribute(popCol);
-                        pops.add(parseCount(v == null ? "" : v.toString(), popCol, shp));
-                    }
-                    var g = geomCol == null ? null : f.getAttribute(geomCol);
-                    geoms.add(g instanceof Geometry geometry ? geometry : null);
+                List<String> raw = file.column(popCol);
+                pop = new long[raw.size()];
+                for (int i = 0; i < pop.length; i++) {
+                    pop[i] = parseCount(raw.get(i) == null ? "" : raw.get(i), popCol, shp);
                 }
             }
-            long[] pop = popCol == null ? null : pops.stream().mapToLong(Long::longValue).toArray();
-            return finish(shp, geoids, names, pop, geomCol == null ? null : geoms, prjWkt);
-        } finally {
-            store.dispose();
+            return finish(shp, geoids, names, pop, file.geometries(), file.prj());
         }
     }
     
@@ -370,18 +323,6 @@ public final class RdhTractImporter {
             String actual = columns.get(n.toUpperCase(Locale.ROOT));
             if (actual != null) {
                 return actual;
-            }
-        }
-        return null;
-    }
-    
-    private static Path sibling(Path shp, String ext) {
-        String base = shp.getFileName().toString();
-        base = base.substring(0, base.length() - 4);
-        for (String e : List.of(ext, ext.toUpperCase(Locale.ROOT))) {
-            Path p = shp.resolveSibling(base + e);
-            if (Files.exists(p)) {
-                return p;
             }
         }
         return null;
