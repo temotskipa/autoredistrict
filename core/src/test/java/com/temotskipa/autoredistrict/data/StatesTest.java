@@ -5,8 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.OptionalInt;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Ported from the Python tests/test_apportionment.py.
@@ -21,6 +20,19 @@ class StatesTest {
         assertTrue(table.keySet().stream().allMatch(k -> k.length() == 2 && k.chars().allMatch(Character::isDigit)));
         assertTrue(table.values().stream().allMatch(s -> s >= 1));
         assertEquals(6, States.all().stream().filter(StateInfo::atLarge).count(), "AK, DE, ND, SD, VT, WY");
+    }
+    
+    @Test
+    void onlyStatesWithMoreThanOneSeatHaveDistricts() {
+        assertEquals(44, States.districted().size());
+        assertEquals(429, States.districted().stream().mapToInt(StateInfo::seats).sum());
+        assertEquals(States.require("NC"), States.require("NC").requireDistricts());
+        for (String abbr : new String[]{"AK", "DE", "ND", "SD", "VT", "WY"}) {
+            StateInfo s = States.require(abbr);
+            assertFalse(States.districted().contains(s), abbr);
+            DataException e = assertThrows(DataException.class, s::requireDistricts, abbr);
+            assertEquals(abbr + " elects its one representative at large, so it has no districts to draw.", e.getMessage());
+        }
     }
     
     @Test

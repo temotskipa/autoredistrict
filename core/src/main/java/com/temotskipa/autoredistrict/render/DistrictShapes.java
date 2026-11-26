@@ -8,6 +8,7 @@ import org.locationtech.jts.operation.union.UnaryUnionOp;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.IntPredicate;
 
 /**
  * District polygons from tract polygons. The tract geometry is a coverage (simplified as one at
@@ -20,12 +21,21 @@ public final class DistrictShapes {
     }
     
     public static Geometry[] of(List<Geometry> tracts, int[] assignment, int k) {
+        return of(tracts, assignment, k, _ -> true);
+    }
+    
+    /**
+     * District polygons from the tracts {@code keep} accepts.
+     */
+    public static Geometry[] of(List<Geometry> tracts, int[] assignment, int k, IntPredicate keep) {
         List<List<Geometry>> parts = new ArrayList<>(k);
         for (int d = 0; d < k; d++) {
             parts.add(new ArrayList<>());
         }
         for (int i = 0; i < assignment.length; i++) {
-            parts.get(assignment[i]).add(tracts.get(i));
+            if (keep.test(i)) {
+                parts.get(assignment[i]).add(tracts.get(i));
+            }
         }
         var out = new Geometry[k];
         GeometryFactory gf = tracts.isEmpty() ? new GeometryFactory() : tracts.getFirst().getFactory();

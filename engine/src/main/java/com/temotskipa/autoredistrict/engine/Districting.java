@@ -17,7 +17,8 @@ import java.util.SplittableRandom;
  *       small area term, so empty tracts aren't free to wander;</li>
  *   <li><b>surface tension</b>: boundary length shared with other districts over the
  *       circumference of a disc of the district's area;</li>
- *   <li><b>election fit</b>: the seat-band penalty ({@link SeatBands}).</li>
+ *   <li><b>election fit</b>: the seat-band penalty plus the spread of each side's seats
+ *       ({@link SeatBands}).</li>
  * </ul>
  * Population is also a hard rule: a flip that would push a district that is inside the tolerance
  * outside it is rejected.
@@ -277,7 +278,7 @@ public final class Districting {
         }
         System.arraycopy(share, 0, sorted, 0, k);
         Arrays.sort(sorted);
-        elecPen = SeatBands.penaltySorted(sorted, k, demSeats, hi, lo);
+        elecPen = SeatBands.termSorted(sorted, k, demSeats, hi, lo);
     }
     
     private double popTermOf(long p) {
@@ -407,7 +408,7 @@ public final class Districting {
         double delta = wPop * (pPopTA + pPopTB - popTerm[a] - popTerm[b]) + wComp * (pCompA + pCompB - compTerm[a] - compTerm[b]) + wTens * (pTensA + pTensB - tensTerm[a] - tensTerm[b]);
         if (wElec != 0) {
             SeatBands.replaceTwo(sorted, k, share[a], share[b], pShareA, pShareB, scratch);
-            pElec = SeatBands.penaltySorted(scratch, k, demSeats, hi, lo);
+            pElec = SeatBands.termSorted(scratch, k, demSeats, hi, lo);
             pElecValid = true;
             delta += wElec * (pElec - elecPen);
         }
@@ -492,7 +493,7 @@ public final class Districting {
         tensTerm[b] = pTensB;
         if (!pElecValid) {
             SeatBands.replaceTwo(sorted, k, share[a], share[b], pShareA, pShareB, scratch);
-            pElec = SeatBands.penaltySorted(scratch, k, demSeats, hi, lo);
+            pElec = SeatBands.termSorted(scratch, k, demSeats, hi, lo);
         }
         double[] t = sorted;
         sorted = scratch;
@@ -830,7 +831,7 @@ public final class Districting {
         double delta = wPop * (popA + popB - popTerm[a] - popTerm[b]) + wComp * (compA + compB - compTerm[a] - compTerm[b]) + wTens * (tensA + tensB - tensTerm[a] - tensTerm[b]);
         if (wElec != 0) {
             SeatBands.replaceTwo(sorted, k, share[a], share[b], shareOf(dem[a] - dd, rep[a] - dr), shareOf(dem[b] + dd, rep[b] + dr), scratch);
-            delta += wElec * (SeatBands.penaltySorted(scratch, k, demSeats, hi, lo) - elecPen);
+            delta += wElec * (SeatBands.termSorted(scratch, k, demSeats, hi, lo) - elecPen);
         }
         return delta / k;
     }

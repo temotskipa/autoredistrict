@@ -20,6 +20,7 @@ final class MapView extends Pane {
     private final Canvas canvas = new Canvas();
     private List<Geometry> tracts;
     private double[] tractShares;
+    private MapData.Shade[] tractShades;
     private MapData plan;
     private Envelope bounds;
     private MapPainter.Viewport viewport;
@@ -62,10 +63,12 @@ final class MapView extends Pane {
     /**
      * Shows a state's tracts, shaded by their own D share, framed on {@code focus} (the populated
      * tracts) when given, so remote empty tracts such as Hawaii's northwestern islands don't shrink it.
+     * Tracts {@code shades} marks hidden (coastal water) are left out.
      */
-    void showState(List<Geometry> tracts, double[] shares, Envelope focus) {
+    void showState(List<Geometry> tracts, double[] shares, MapData.Shade[] shades, Envelope focus) {
         this.tracts = tracts;
         this.tractShares = shares;
+        this.tractShades = shades;
         this.plan = null;
         var env = new Envelope();
         if (focus != null && !focus.isNull()) {
@@ -126,6 +129,9 @@ final class MapView extends Pane {
         }
         else if (tracts != null) {
             for (int i = 0; i < tracts.size(); i++) {
+                if (tractShades[i] == MapData.Shade.HIDDEN) {
+                    continue;
+                }
                 int col = MapPainter.shareColor(tractShares[i]);
                 MapPainter.path(c, tracts.get(i), viewport);
                 c.fill(col);

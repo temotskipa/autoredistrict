@@ -15,7 +15,22 @@ public value record StateInfo(String abbr, String fips, String name, int seats) 
         return abbr.toLowerCase(Locale.ROOT);
     }
     
+    /**
+     * Whether the state elects its one representative statewide, so it has no districts.
+     */
     public boolean atLarge() {
         return seats == 1;
+    }
+    
+    /**
+     * This state, if it has districts to draw.
+     *
+     * @throws DataException for an at-large state
+     */
+    public StateInfo requireDistricts() {
+        if (atLarge()) {
+            throw new DataException(abbr + " elects its one representative at large, so it has no districts to draw.");
+        }
+        return this;
     }
 }

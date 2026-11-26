@@ -58,6 +58,18 @@ public final class GeoIds {
     }
     
     /**
+     * Whether a tract GEOID is a water-only tract, which the Census Bureau numbers 9900 to 9998
+     * (the first four digits of the six-digit tract code).
+     */
+    public static boolean isWaterTract(String geoid) {
+        if (geoid.length() != TRACT_WIDTH || !geoid.chars().allMatch(Character::isDigit)) {
+            return false;
+        }
+        int base = Integer.parseInt(geoid.substring(5, 9));
+        return base >= 9900 && base <= 9998;
+    }
+    
+    /**
      * "tract" for 11 digits, "block" for 15, empty otherwise.
      */
     public static Optional<String> resolutionForWidth(int width) {

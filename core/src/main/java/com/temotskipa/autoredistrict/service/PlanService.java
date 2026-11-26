@@ -13,7 +13,7 @@ import java.util.List;
 
 /**
  * Runs plan requests on cached states. Both front ends call this; it never imports or touches
- * the network.
+ * the network. At-large states are refused: they have no districts to draw.
  */
 public value record PlanService(Path cacheRoot) {
     
@@ -39,7 +39,7 @@ public value record PlanService(Path cacheRoot) {
     
     private PlanResult run(StateDataset ds, PlanOptions o, Listener listener, boolean untilHit) throws InterruptedException {
         long t0 = System.nanoTime();
-        StateInfo st = ds.state();
+        StateInfo st = ds.state().requireDistricts();
         int k = st.seats();
         double share = ds.demShare();
         int proportional = PlanOptions.proportional(share, k);
@@ -49,56 +49,39 @@ public value record PlanService(Path cacheRoot) {
         }
         Graph g = ds.graph();
         List<String> warnings = new ArrayList<>(ds.warnings());
-        int[] assignment;
-        int seeds;
-        int bestChain = -1;
-        int chainsHit = 0;
+        Schedule s = Schedules.forTracts(g.size(), o.scheduleScale(), o.timeBudget());
+        var target = new Target(k, dem, o.minMargin(), o.tolerance());
+        long[] seedList = Annealer.seeds(o.baseSeed(), o.seeds());
+        List<ChainResult> rs;
         long proposals = 0;
-        boolean timedOut = false;
-        String schedule;
-        if (k == 1) {
-            // At-large: the whole state is the district. No anneal.
-            assignment = new int[g.size()];
-            seeds = 0;
-            schedule = "at-large (no anneal)";
+        if (untilHit) {
+            // Cancelled chains count toward flips per second too.
+            Annealer.Until until = Annealer.runUntil(g, target, s, GraphVoronoi.INSTANCE, seedList, listener, r -> r.hit() && r.populationValid());
+            rs = until.finished();
+            proposals = until.proposals();
         }
         else {
-            Schedule s = Schedules.forTracts(g.size(), o.scheduleScale(), o.timeBudget());
-            schedule = Schedules.describe(s);
-            var target = new Target(k, dem, o.minMargin(), o.tolerance());
-            long[] seedList = Annealer.seeds(o.baseSeed(), o.seeds());
-            List<ChainResult> rs;
-            if (untilHit) {
-                // Cancelled chains count toward flips per second too.
-                Annealer.Until until = Annealer.runUntil(g, target, s, GraphVoronoi.INSTANCE, seedList, listener, r -> r.hit() && r.populationValid());
-                rs = until.finished();
-                proposals = until.proposals();
-            }
-            else {
-                rs = Annealer.runAll(g, target, s, GraphVoronoi.INSTANCE, seedList, listener);
-                for (ChainResult r : rs) {
-                    proposals += r.proposals();
-                }
-            }
-            ChainResult best = Annealer.best(rs);
-            assignment = best.assignment();
-            seeds = o.seeds();
-            bestChain = best.chain();
+            rs = Annealer.runAll(g, target, s, GraphVoronoi.INSTANCE, seedList, listener);
             for (ChainResult r : rs) {
-                if (r.hit()) {
-                    chainsHit++;
-                }
-                timedOut |= r.timedOut();
-            }
-            if (timedOut) {
-                warnings.add("A chain stopped at its time budget of " + o.timeBudget().toMinutes() + " min.");
+                proposals += r.proposals();
             }
         }
-        if (k > 1) {
-            EmptyTractCleanup.apply(g, assignment, k);
+        ChainResult best = Annealer.best(rs);
+        int[] assignment = best.assignment();
+        int chainsHit = 0;
+        boolean timedOut = false;
+        for (ChainResult r : rs) {
+            if (r.hit()) {
+                chainsHit++;
+            }
+            timedOut |= r.timedOut();
         }
+        if (timedOut) {
+            warnings.add("A chain stopped at its time budget of " + o.timeBudget().toMinutes() + " min.");
+        }
+        EmptyTractCleanup.apply(g, assignment, k);
         PlanMetrics m = PlanMetrics.compute(ds, assignment, k);
         double secs = (System.nanoTime() - t0) / 1e9;
-        return new PlanResult(st, k, dem, o.demSeats() == null, o.minMargin(), o.tolerance(), ds.voteDataLabel(), share, m, assignment, seeds, o.baseSeed(), bestChain, chainsHit, proposals, secs > 0 ? proposals / secs : 0, secs, schedule, k == 1, timedOut, List.copyOf(warnings));
+        return new PlanResult(st, k, dem, o.demSeats() == null, o.minMargin(), o.tolerance(), ds.voteDataLabel(), share, m, assignment, o.seeds(), o.baseSeed(), best.chain(), chainsHit, proposals, secs > 0 ? proposals / secs : 0, secs, Schedules.describe(s), timedOut, List.copyOf(warnings));
     }
 }

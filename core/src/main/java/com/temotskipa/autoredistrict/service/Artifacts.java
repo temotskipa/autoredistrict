@@ -1,5 +1,6 @@
 package com.temotskipa.autoredistrict.service;
 
+import com.temotskipa.autoredistrict.data.GeoIds;
 import com.temotskipa.autoredistrict.data.Json;
 import com.temotskipa.autoredistrict.data.StateDataset;
 import com.temotskipa.autoredistrict.render.Exporters;
@@ -29,20 +30,23 @@ public final class Artifacts {
      * Map data with the standard title and subtitle.
      */
     public static MapData mapData(PlanResult r, StateDataset ds) {
-        String title = String.format(Locale.ROOT, "%s (%s) — %d district%s", r.state().name(), r.state().abbr(), r.districts(), r.districts() == 1 ? " (at-large)" : "s");
+        String title = String.format(Locale.ROOT, "%s (%s) — %d districts", r.state().name(), r.state().abbr(), r.districts());
         String subtitle = String.format(Locale.ROOT, "requested %d D%s · won %s · %s · max dev %.2f%% · closest margin %.1f pts · %s votes", r.demRequested(), r.proportionalDefault() ? " (proportional)" : "", MapRenderer.seats(r.metrics().demWon(), r.metrics().repWon()), r.hit() ? "hit" : "miss", r.metrics().maxDeviation() * 100, r.metrics().closestMargin(), r.voteData());
-        return MapData.of(title, subtitle, ds.geometry(), r.assignment(), r.districts(), r.metrics().demShares(), populatedExtent(ds), emptyTracts(ds));
+        return MapData.of(title, subtitle, ds.geometry(), r.assignment(), r.districts(), r.metrics().demShares(), populatedExtent(ds), tractShades(ds));
     }
     
     /**
-     * Tracts with no people.
+     * How each tract is drawn: faded without people, and hidden when it is also a water-only tract,
+     * so maps follow the coastline instead of showing a band of coastal water.
      */
-    public static boolean[] emptyTracts(StateDataset ds) {
-        var e = new boolean[ds.size()];
-        for (int i = 0; i < e.length; i++) {
-            e[i] = ds.tracts().pop()[i] == 0;
+    public static MapData.Shade[] tractShades(StateDataset ds) {
+        int[] pop = ds.tracts().pop();
+        String[] geoids = ds.tracts().geoid();
+        var shades = new MapData.Shade[ds.size()];
+        for (int i = 0; i < shades.length; i++) {
+            shades[i] = pop[i] > 0 ? MapData.Shade.FULL : GeoIds.isWaterTract(geoids[i]) ? MapData.Shade.HIDDEN : MapData.Shade.FADED;
         }
-        return e;
+        return shades;
     }
     
     /**
@@ -125,11 +129,11 @@ public final class Artifacts {
      */
     public static String districtTable(PlanResult r) {
         var sb = new StringBuilder("""
-                                   | district | population | deviation % | D share | winner | margin (pts) | tracts | Polsby-Popper |
-                                   |---:|---:|---:|---:|---|---:|---:|---:|
+                                   | district | population | deviation % | D share | R share | winner | margin (pts) | tracts | Polsby-Popper |
+                                   |---:|---:|---:|---:|---:|---|---:|---:|---:|
                                    """);
         for (DistrictResult d : r.metrics().rows()) {
-            sb.append(String.format(Locale.ROOT, "| %d | %,d | %+.3f | %.4f | %s | %+.2f | %d | %.3f |%n", d.district(), d.population(), d.deviation() * 100, d.demShare(), d.winner(), d.margin(), d.tracts(), d.polsbyPopper()));
+            sb.append(String.format(Locale.ROOT, "| %d | %,d | %+.3f | %.4f | %.4f | %s | %+.2f | %d | %.3f |%n", d.district(), d.population(), d.deviation() * 100, d.demShare(), d.repShare(), d.winner(), d.margin(), d.tracts(), d.polsbyPopper()));
         }
         return sb.toString();
     }

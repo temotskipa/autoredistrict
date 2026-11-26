@@ -2,10 +2,11 @@
 
 ## Project overview
 
-Autoredistrict draws tract-level congressional maps that deliver a requested number of Democratic seats, for all 50
-states. It is a Java 28 application (preview features on) with a JavaFX GUI and a picocli CLI. Both call the same
-service layer. The method is a Monte Carlo simulated anneal after AlphaPhoenix's video "Algorithmic Redistricting:
-Elections made-to-order"; README.md describes it.
+Autoredistrict draws tract-level congressional maps that deliver a requested number of Democratic seats, for the 44
+states with more than one seat (the six at-large states have no districts and are refused). It is a Java 28 application
+(preview features on) with a JavaFX GUI and a picocli CLI. Both call the same service layer. The method is a Monte Carlo
+simulated anneal after AlphaPhoenix's video "Algorithmic Redistricting: Elections made-to-order"; README.md describes
+it.
 
 ## Modules
 
@@ -20,7 +21,7 @@ Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<proje
 	  `Shapefile` (polygon shapefiles with dBASE tables, read and written), `AlbersProjection`, `AdjacencyBuilder`,
 	  `Connectivity`, `BlockVotes`, `TractCache` (`.cache/rdh/<st>/`), `StateDataset`, `StateImporter`, `States`
 	  (2020 apportionment).
-	- package `service`: `PlanService` (run, at-large short cut), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS
+	- package `service`: `PlanService` (run; refuses at-large states), `GraphVoronoi`, `Schedules`, `PlanMetrics` (PASS
 	  checks), `SeatRange`, `BatchRunner`, `Artifacts`, `ImportService`. New features belong here, not in a front end.
 	- package `render`: `MapPainter` over `Canvas2D` (Java2D here, JavaFX in the GUI), `MapRenderer`, `Exporters`.
 - `cli`: `Main` with `import`, `run`, `all`, `seat-range`.

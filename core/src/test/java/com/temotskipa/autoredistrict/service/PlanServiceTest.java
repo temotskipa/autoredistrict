@@ -45,22 +45,14 @@ class PlanServiceTest {
     }
     
     @Test
-    void atLargeStatesAreOneDistrictWithoutAnAnneal() throws InterruptedException {
+    void atLargeStatesHaveNoMapToDraw() {
         StateInfo vt = States.require("VT");
         SyntheticState.write(tmp, vt, 6, 6, 0.1);
         StateDataset ds = StateDataset.load(tmp, vt, Election.Y2024);
-        PlanResult r = new PlanService(tmp).run(ds, PlanOptions.defaults(), _ -> {
+        DataException e = assertThrows(DataException.class, () -> new PlanService(tmp).run(ds, PlanOptions.defaults(), _ -> {
             throw new AssertionError("no chain should run");
-        });
-        assertTrue(r.atLarge());
-        assertEquals(0, r.seeds());
-        assertEquals(0, r.proposals());
-        assertEquals(1, r.metrics().districts());
-        assertTrue(Arrays.stream(r.assignment()).allMatch(d -> d == 0));
-        assertEquals(36_000, r.metrics().population());
-        assertTrue(r.pass());
-        assertEquals(1, r.demRequested(), "D share 0.6 rounds to the single seat");
-        assertTrue(r.hit());
+        }));
+        assertEquals("VT elects its one representative at large, so it has no districts to draw.", e.getMessage());
     }
     
     @Test
@@ -100,6 +92,10 @@ class PlanServiceTest {
         assertTrue(r.pass(), "max dev " + r.metrics().maxDeviation());
         assertTrue(r.hit());
         assertEquals(2, r.metrics().rows().size());
+        // The district table shows each district's R share next to its D share.
+        DistrictResult first = r.metrics().rows().getFirst();
+        assertEquals(1.0, first.demShare() + first.repShare(), 1e-12);
+        assertTrue(Artifacts.districtTable(r).contains(String.format(Locale.ROOT, "| %.4f | %.4f | %s |", first.demShare(), first.repShare(), first.winner())));
         List<Path> files = Artifacts.write(r, ds, tmp.resolve("out"), "me", true);
         for (Path f : files) {
             assertTrue(Files.size(f) > 0, f.toString());
@@ -118,7 +114,7 @@ class PlanServiceTest {
         assertTrue(r.pass());
         assertTrue(r.metrics().maxDeviation() > 1e-6);
         // The same plan from a request with a 0.0001% tolerance: every view must call it a FAIL.
-        var strict = new PlanResult(r.state(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), 1e-6, r.voteData(), r.statewideDemShare(), r.metrics(), r.assignment(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.atLarge(), r.timedOut(), r.warnings());
+        var strict = new PlanResult(r.state(), r.districts(), r.demRequested(), r.proportionalDefault(), r.minMargin(), 1e-6, r.voteData(), r.statewideDemShare(), r.metrics(), r.assignment(), r.seeds(), r.baseSeed(), r.bestChain(), r.chainsHit(), r.proposals(), r.flipsPerSecond(), r.seconds(), r.schedule(), r.timedOut(), r.warnings());
         assertFalse(strict.pass());
         Path report = tmp.resolve("strict.json");
         Artifacts.writeReport(strict, report);
@@ -161,23 +157,23 @@ class PlanServiceTest {
     @Test
     void batchRunsEveryStateAndSummarisesPassesHitsAndTime() throws Exception {
         StateInfo me = States.require("ME");
-        StateInfo vt = States.require("VT");
+        StateInfo nh = States.require("NH");
         SyntheticState.write(tmp, me, 12, 10);
-        SyntheticState.write(tmp, vt, 5, 5);
+        SyntheticState.write(tmp, nh, 12, 10);
         Path out = tmp.resolve("all");
         List<String> log = new ArrayList<>();
-        BatchRunner.Summary s = BatchRunner.run(new PlanService(tmp), List.of(me, vt, States.require("NH")), fast(null), Election.Y2024, out, log::add);
+        BatchRunner.Summary s = BatchRunner.run(new PlanService(tmp), List.of(me, nh, States.require("RI")), fast(null), Election.Y2024, out, log::add);
         assertEquals(3, s.rows().size());
         assertEquals(new BatchRunner.Passed(), s.rows().get(0).outcome());
         assertEquals(new BatchRunner.Passed(), s.rows().get(1).outcome());
-        assertInstanceOf(BatchRunner.Errored.class, s.rows().get(2).outcome(), "NH isn't in the cache");
+        assertInstanceOf(BatchRunner.Errored.class, s.rows().get(2).outcome(), "RI isn't in the cache");
         assertTrue(s.rows().get(2).status().startsWith("ERROR: "), s.rows().get(2).status());
         assertEquals(2, s.passCount());
-        assertEquals(3, s.totalSeats());
+        assertEquals(4, s.totalSeats());
         assertEquals(3, log.size(), log.toString());
-        assertTrue(log.get(2).startsWith("NH: ERROR"), log.get(2));
+        assertTrue(log.get(2).startsWith("RI: ERROR"), log.get(2));
         String md = BatchRunner.markdown(s);
-        assertTrue(md.contains("3 states, 3 seats in total; 2 PASS"), md);
+        assertTrue(md.contains("3 states, 4 seats in total; 2 PASS"), md);
         assertTrue(md.contains("slowest state"), md);
         assertTrue(Files.size(out.resolve("contact-sheet.png")) > 0);
         assertTrue(Files.readString(out.resolve("summary.csv")).startsWith("state,fips,seats"));

@@ -2,8 +2,8 @@
 
 Autoredistrict draws congressional maps that deliver a requested number of Democratic seats. You give it a state and
 a seat count; it draws a valid tract-level map (equal population within 1%, every district contiguous) that produces
-that result under one election's vote data. It works for all 50 states, runs locally on a JDK 28 desktop, and needs
-no Census API key and no access to census.gov.
+that result under one election's vote data. It works for the 44 states with more than one seat, runs locally on a JDK
+28 desktop, and needs no Census API key and no access to census.gov.
 
 There is a JavaFX desktop GUI and a command line. Both call the same service layer.
 
@@ -28,6 +28,10 @@ Monte Carlo simulated anneal that flips one unit at a time. Census tracts take t
 	- surface tension: boundary length shared with other districts;
 	- election fit: districts sorted by D share; the top N must reach 50% + margin/2 and the rest stay below
 	  50% - margin/2. The penalty is the squared distance outside those bands, so districts near 50% carry the weight.
+	  A spread term then lifts each side's weak seats toward that side's mean share (squared distance, counted only for
+	  seats weaker than the mean), so a party's seats end up about equally safe instead of a few packed seats and many
+	  at the edge of the band. Packed seats count only through the seats they leave weak, so the anneal gives up
+	  compactness to unpack a city only where that makes another seat safer.
 4. **Contiguity**: a flip that would split the district it leaves is rejected, checked with a fast neighbour test and
    otherwise a bounded simultaneous BFS. If the flip would only cut off a small piece (up to 40 tracts), the tract and
    that piece can move together, so a district with a one-tract-wide tail can still shrink.
@@ -94,7 +98,8 @@ census.gov blocks some regions (Cloudflare 403), so all geography and votes come
 [Redistricting Data Hub](https://redistrictingdatahub.org/). Put these files in one folder, for example
 `C:\Users\you\Downloads\rdh`:
 
-1. **Tracts with population**: RDH's 2020 PL 94-171 tract shapefile for each state, `xx_pl2020_t.zip` (50 files).
+1. **Tracts with population**: RDH's 2020 PL 94-171 tract shapefile for each state, `xx_pl2020_t.zip` (44 files; the
+   at-large states' aren't needed).
 2. **Votes**:
 	- `xx_2024_gen_2020_blocks_csv.zip`, "2024 General Election Results Disaggregated to the 2020 Block", for every
 	  state except California (RDH has only precinct results for CA in 2024);
@@ -115,7 +120,7 @@ $ar = "cli\build\install\autoredistrict\bin\autoredistrict.bat"
 
 `import` reads the zips once into `.cache\rdh\<st>\`: tracts, rook adjacency (shared boundary segments), bridges that
 link islands and water gaps to their nearest neighbour, simplified map geometry, votes for 2024 and 2020, and a
-manifest with the source files' SHA-256s. All 50 states take about 20 s. Missing files are listed by name. Runs read
+manifest with the source files' SHA-256s. All 44 states take about 20 s. Missing files are listed by name. Runs read
 only the cache.
 
 ```powershell
@@ -137,16 +142,18 @@ Options for `run`, `all` and `seat-range`:
 | Option                  | Default       | Meaning                                                                                                           |
 |-------------------------|---------------|-------------------------------------------------------------------------------------------------------------------|
 | `--dem-seats N`         | proportional  | Democratic seats to deliver, 0..k (`run` only).                                                                   |
+| `--rep-seats N`         | proportional  | Republican seats to deliver, 0..k; Democrats get the rest (`run` only, instead of `--dem-seats`).                 |
 | `--min-margin P`        | 2.0           | Two-party margin in points each targeted district should clear: D seats aim for 50% + P/2, R seats for 50% - P/2. |
 | `--seeds S`             | cores, max 16 | Chains run in parallel per request; the best is kept. A request hits if its best chain hits.                      |
 | `--seed X`              | 1             | Seed of chain 0; chain i uses X + i. Runs are reproducible.                                                       |
 | `--election 2024\|2020` | 2024          | Presidential race used for votes. California falls back to 2020 and says so in the output and tables.             |
 | `--scale F`             | 1.0           | Multiplies the step counts.                                                                                       |
 
-A run **hits** when the D seats won (D share above 50%) equal the request. A plan **passes** when it has the
-apportioned number of districts, every district within 1% of the ideal population, every district contiguous, every
-tract assigned once, and the population equal to the imported total. At-large states (AK, DE, ND, SD, VT, WY) are one
-district without an anneal.
+A run **hits** when the D seats won (D share above 50%) equal the request. A plan **passes** when it has the apportioned
+number of districts, every district within 1% of the ideal population, every district contiguous, every tract assigned
+once, and the population equal to the imported total. At-large states (AK, DE, ND, SD, VT, WY) elect their one
+representative statewide, so there is no map to draw: `run` and `seat-range` refuse them, `--states all` leaves them out
+of `import` and `all` (naming one is an error), and the GUI doesn't list them or import their files.
 
 ## GUI
 
@@ -154,11 +161,12 @@ district without an anneal.
 .\gradlew.bat :gui:run
 ```
 
-Pick an imported state (or import with *Import RDH files…*), set the Democratic seats (the spinner shows 0..k and the
-proportional default), the minimum margin, the seeds and the election, and press Run. The run happens in the
-background with live phase, flips per second, score and current D–R; Cancel stops every chain. The map supports zoom
-(scroll), pan (drag) and fit (double-click). The table lists each district's population, deviation, D share, winner
-and margin. Export writes the PNG, GeoJSON or assignment CSV.
+Pick an imported state (or import with *Import RDH files…*; at-large states aren't listed), set the Democratic or
+Republican seats (the two spinners are linked, so they always add up to the state's seats; the hint shows the
+proportional default), the minimum margin, the seeds and the election, and press Run. The run happens in the background
+with live phase, flips per second, score and current D–R; Cancel stops every chain. The map supports zoom (scroll), pan
+(drag) and fit (double-click). The table lists each district's population, deviation, D and R shares, winner and margin.
+Export writes the PNG, GeoJSON or assignment CSV.
 
 For checks without a person at the screen, snapshot mode runs a plan in the real window and saves it:
 

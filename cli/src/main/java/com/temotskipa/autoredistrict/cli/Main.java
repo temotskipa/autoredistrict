@@ -44,17 +44,18 @@ public final class Main implements Runnable {
     }
     
     /**
-     * Parses "all" or a comma-separated list; a state named twice (NC,nc,37) is kept once. A list
-     * that names no state (an empty value, or only commas) is an error.
+     * Parses "all" (every state with districts) or a comma-separated list; a state named twice
+     * (NC,nc,37) is kept once. A list that names no state (an empty value, or only commas) or names
+     * an at-large state is an error.
      */
     static List<StateInfo> parseStates(String spec) {
         if (spec == null || spec.equalsIgnoreCase("all")) {
-            return States.all();
+            return States.districted();
         }
         Set<StateInfo> out = new LinkedHashSet<>();
         for (String s : spec.split(",")) {
             if (!s.isBlank()) {
-                out.add(States.require(s.strip()));
+                out.add(States.require(s.strip()).requireDistricts());
             }
         }
         if (out.isEmpty()) {
@@ -150,7 +151,7 @@ public final class Main implements Runnable {
         @Option(names = "--rdh-dir", required = true, description = "Folder with the RDH downloads.")
         Path rdhDir;
         
-        @Option(names = "--states", defaultValue = "all", description = "Comma-separated states, or all (default).")
+        @Option(names = "--states", defaultValue = "all", description = "Comma-separated states, or all (default): every state with districts.")
         String states;
         
         @Option(names = "--parallel", defaultValue = "6", description = "States imported at once (default 6).")
@@ -180,7 +181,33 @@ public final class Main implements Runnable {
         }
     }
     
-    @Command(name = "run", mixinStandardHelpOptions = true, description = "Draw one state's map for a requested number of Democratic seats.")
+    /**
+     * A seat request: Democratic or Republican seats, not both. Without either, the proportional
+     * default.
+     */
+    static final class SeatRequest {
+        
+        @Option(names = "--dem-seats", description = "Democratic seats to deliver (default: proportional).")
+        Integer dem;
+        
+        @Option(names = "--rep-seats", description = "Republican seats to deliver; Democrats get the rest.")
+        Integer rep;
+        
+        /**
+         * The Democratic seats this asks for in {@code st}.
+         */
+        Integer demSeats(StateInfo st) {
+            if (rep == null) {
+                return dem;
+            }
+            if (rep < 0 || rep > st.seats()) {
+                throw new DataException("--rep-seats for " + st.abbr() + " must be between 0 and " + st.seats() + ", not " + rep + ".");
+            }
+            return st.seats() - rep;
+        }
+    }
+    
+    @Command(name = "run", mixinStandardHelpOptions = true, description = "Draw one state's map for a requested number of Democratic or Republican seats.")
     static final class RunCommand implements Callable<Integer> {
         
         @ParentCommand
@@ -189,8 +216,9 @@ public final class Main implements Runnable {
         @Parameters(index = "0", description = "State, e.g. NC.")
         String state;
         
-        @Option(names = "--dem-seats", description = "Democratic seats to deliver (default: proportional).")
-        Integer demSeats;
+        // An ArgGroup is exclusive by default: --dem-seats or --rep-seats, not both.
+        @ArgGroup
+        SeatRequest seats;
         
         @Option(names = "--out-dir", defaultValue = "out", description = "Where to write the map and reports.")
         Path outDir;
@@ -203,10 +231,10 @@ public final class Main implements Runnable {
         
         @Override
         public Integer call() throws Exception {
-            StateInfo st = States.require(state);
+            StateInfo st = States.require(state).requireDistricts();
             var svc = new PlanService(parent.cacheDir);
             StateDataset ds = svc.load(st, args.election());
-            PlanResult r = svc.run(ds, args.options(demSeats), consoleProgress(quiet));
+            PlanResult r = svc.run(ds, args.options(seats == null ? null : seats.demSeats(st)), consoleProgress(quiet));
             printResult(r);
             System.out.print(Artifacts.districtTable(r));
             String stem = st.key() + "-" + r.demRequested() + "d";
@@ -226,7 +254,7 @@ public final class Main implements Runnable {
         @Option(names = "--out-dir", defaultValue = "out/all", description = "Output folder.")
         Path outDir;
         
-        @Option(names = "--states", defaultValue = "all", description = "Comma-separated states, or all (default).")
+        @Option(names = "--states", defaultValue = "all", description = "Comma-separated states, or all (default): every state with districts.")
         String states;
         
         @Mixin
@@ -272,7 +300,7 @@ public final class Main implements Runnable {
         
         @Override
         public Integer call() throws Exception {
-            StateInfo st = States.require(state);
+            StateInfo st = States.require(state).requireDistricts();
             var svc = new PlanService(parent.cacheDir);
             StateDataset ds = svc.load(st, args.election());
             int k = st.seats();

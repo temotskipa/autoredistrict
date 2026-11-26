@@ -2,11 +2,8 @@ package com.temotskipa.autoredistrict.gui;
 
 import atlantafx.base.theme.PrimerLight;
 import com.temotskipa.autoredistrict.data.BlockVotes.Election;
-import com.temotskipa.autoredistrict.data.StateDataset;
+import com.temotskipa.autoredistrict.data.*;
 import com.temotskipa.autoredistrict.data.StateImporter.ImportResult;
-import com.temotskipa.autoredistrict.data.StateInfo;
-import com.temotskipa.autoredistrict.data.States;
-import com.temotskipa.autoredistrict.data.TractCache;
 import com.temotskipa.autoredistrict.engine.Annealer;
 import com.temotskipa.autoredistrict.engine.Progress;
 import com.temotskipa.autoredistrict.gui.Launcher.Options;
@@ -54,6 +51,7 @@ public final class App extends Application {
     
     private final ComboBox<StateInfo> stateBox = new ComboBox<>();
     private final Spinner<Integer> demSpinner = new Spinner<>(0, 1, 0);
+    private final Spinner<Integer> repSpinner = new Spinner<>(0, 1, 1);
     private final Label demRange = new Label();
     private final Spinner<Double> marginSpinner = new Spinner<>(0.0, 30.0, PlanOptions.DEFAULT_MARGIN, 0.5);
     private final Spinner<Integer> seedsSpinner = new Spinner<>(1, 64, Annealer.defaultSeeds());
@@ -86,6 +84,10 @@ public final class App extends Application {
      * The newest state load; completions of older ones are ignored.
      */
     private Task<StateDataset> loading;
+    /**
+     * Set while one seat spinner updates the other, so the update doesn't bounce back.
+     */
+    private boolean linkingSeats;
     
     private static <T> TableColumn<DistrictResult, T> column(String name, Function<DistrictResult, T> f) {
         TableColumn<DistrictResult, T> c = new TableColumn<>(name);
@@ -137,7 +139,10 @@ public final class App extends Application {
                 loadState(stateBox.getValue());
             }
         });
-        for (Spinner<?> s : List.of(demSpinner, marginSpinner, seedsSpinner)) {
+        // D and R seats always add up to the state's seats: changing one sets the other.
+        demSpinner.valueProperty().addListener((_, _, d) -> linkSeats(d, repSpinner));
+        repSpinner.valueProperty().addListener((_, _, rep) -> linkSeats(rep, demSpinner));
+        for (Spinner<?> s : List.of(demSpinner, repSpinner, marginSpinner, seedsSpinner)) {
             s.setEditable(true);
             s.setMaxWidth(Double.MAX_VALUE);
         }
@@ -154,6 +159,7 @@ public final class App extends Application {
         form.addRow(r++, new Label("State"), stateBox);
         form.addRow(r++, new Label("Vote data"), electionBox);
         form.addRow(r++, new Label("Democratic seats"), demSpinner);
+        form.addRow(r++, new Label("Republican seats"), repSpinner);
         form.add(demRange, 1, r++);
         form.addRow(r++, new Label("Min margin (pts)"), marginSpinner);
         form.addRow(r, new Label("Seeds"), seedsSpinner);
@@ -209,6 +215,7 @@ public final class App extends Application {
         table.getColumns().add(column("Population", d -> String.format(Locale.ROOT, "%,d", d.population())));
         table.getColumns().add(column("Deviation %", d -> String.format(Locale.ROOT, "%+.3f", d.deviation() * 100)));
         table.getColumns().add(column("D share", d -> String.format(Locale.ROOT, "%.1f%%", d.demShare() * 100)));
+        table.getColumns().add(column("R share", d -> String.format(Locale.ROOT, "%.1f%%", d.repShare() * 100)));
         table.getColumns().add(column("Winner", DistrictResult::winner));
         table.getColumns().add(column("Margin (pts)", d -> String.format(Locale.ROOT, "%+.1f", d.margin())));
         table.getColumns().add(column("Tracts", DistrictResult::tracts));
@@ -223,7 +230,7 @@ public final class App extends Application {
     
     private void refreshStates() {
         List<StateInfo> imported = new ArrayList<>();
-        for (StateInfo s : States.all()) {
+        for (StateInfo s : States.districted()) {
             if (TractCache.isImported(opts.cacheDir(), s)) {
                 imported.add(s);
             }
@@ -265,17 +272,23 @@ public final class App extends Application {
             setExportsDisabled(true);
             int k = s.seats();
             int prop = PlanOptions.proportional(dataset.demShare(), k);
-            demSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, k, prop));
-            demRange.setText(String.format(Locale.ROOT, "0..%d · proportional %d (D share %.1f%%)", k, prop, dataset.demShare() * 100));
+            linkingSeats = true;
+            try {
+                demSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, k, prop));
+                repSpinner.setValueFactory(new SpinnerValueFactory.IntegerSpinnerValueFactory(0, k, k - prop));
+            } finally {
+                linkingSeats = false;
+            }
+            demRange.setText(String.format(Locale.ROOT, "0..%d each · proportional %d D–%d R (D share %.1f%%)", k, prop, k - prop, dataset.demShare() * 100));
             var shares = new double[dataset.size()];
             for (int i = 0; i < shares.length; i++) {
                 double d = dataset.graph().dem(i);
                 double r = dataset.graph().rep(i);
                 shares[i] = d + r > 0 ? d / (d + r) : 0.5;
             }
-            mapView.showState(dataset.geometry(), shares, Artifacts.populatedExtent(dataset));
+            mapView.showState(dataset.geometry(), shares, Artifacts.tractShades(dataset), Artifacts.populatedExtent(dataset));
             table.getItems().clear();
-            resultLabel.setText(s.name() + ": " + dataset.size() + " tracts, " + k + " seat" + (k == 1 ? "" : "s") + ", votes " + dataset.voteDataLabel());
+            resultLabel.setText(s.name() + ": " + dataset.size() + " tracts, " + k + " seats, votes " + dataset.voteDataLabel());
             statusLabel.setText(String.join("\n", dataset.warnings()));
             if (opts.snapshotState() != null && s.abbr().equalsIgnoreCase(opts.snapshotState())) {
                 if (opts.demSeats() != null) {
@@ -379,6 +392,21 @@ public final class App extends Application {
         setExportsDisabled(false);
     }
     
+    /**
+     * Sets {@code other} so that the two seat spinners add up to the state's seats.
+     */
+    private void linkSeats(Integer value, Spinner<Integer> other) {
+        if (linkingSeats || value == null || !(other.getValueFactory() instanceof SpinnerValueFactory.IntegerSpinnerValueFactory f)) {
+            return;
+        }
+        linkingSeats = true;
+        try {
+            f.setValue(f.getMax() - value);
+        } finally {
+            linkingSeats = false;
+        }
+    }
+    
     private void setRunning(boolean on) {
         runButton.setDisable(on);
         cancelButton.setDisable(!on);
@@ -428,15 +456,29 @@ public final class App extends Application {
         }
         Path dir = files.getFirst().toPath().getParent();
         List<StateInfo> states = new ArrayList<>();
+        List<String> atLarge = new ArrayList<>();
         for (File f : files) {
-            States.find(f.getName().substring(0, 2)).ifPresent(states::add);
+            // At-large states have no districts to draw, so their files are left alone.
+            States.find(f.getName().substring(0, 2)).ifPresent(s -> {
+                if (s.atLarge()) {
+                    atLarge.add(s.abbr());
+                }
+                else {
+                    states.add(s);
+                }
+            });
+        }
+        String skipped = atLarge.isEmpty() ? "" : "; skipped " + String.join(", ", atLarge) + " (at large, no districts to draw)";
+        if (states.isEmpty()) {
+            statusLabel.setText("Nothing imported" + skipped);
+            return;
         }
         Task<List<ImportResult>> t = importTask(dir, states);
         t.setOnSucceeded(_ -> {
             afterImport(states);
             List<ImportResult> results = t.getValue();
             List<String> failed = ImportService.failures(results);
-            statusLabel.setText("Imported " + (results.size() - failed.size()) + " of " + results.size() + " state(s) from " + dir);
+            statusLabel.setText("Imported " + (results.size() - failed.size()) + " of " + results.size() + " state(s) from " + dir + skipped);
             if (!failed.isEmpty()) {
                 // A state that fails doesn't stop the others, so the task succeeds; say which failed.
                 var a = new Alert(Alert.AlertType.ERROR, String.join("\n", failed));
@@ -480,13 +522,17 @@ public final class App extends Application {
     }
     
     private void startSnapshot() {
-        StateInfo s = States.require(opts.snapshotState());
-        if (!stateBox.getItems().contains(s)) {
-            System.err.println(s.abbr() + " isn't imported in " + opts.cacheDir());
+        try {
+            StateInfo s = States.require(opts.snapshotState()).requireDistricts();
+            if (!stateBox.getItems().contains(s)) {
+                throw new DataException(s.abbr() + " isn't imported in " + opts.cacheDir());
+            }
+            stateBox.setValue(s);
+        } catch (DataException e) {
+            System.err.println(e.getMessage());
             Platform.exit();
             System.exit(3);
         }
-        stateBox.setValue(s);
     }
     
     private void saveSnapshot() {

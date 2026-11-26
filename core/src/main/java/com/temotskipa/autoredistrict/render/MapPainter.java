@@ -59,9 +59,13 @@ public final class MapPainter {
         }
         // Tract fills, stroked in the same colour to hide hairline gaps between neighbours.
         for (int i = 0; i < data.assignment().length; i++) {
+            MapData.Shade shade = data.shade(i);
+            if (shade == MapData.Shade.HIDDEN) {
+                continue;
+            }
             Geometry g = data.tracts().get(i);
             int col = color[data.assignment()[i]];
-            if (data.isEmpty(i)) {
+            if (shade == MapData.Shade.FADED) {
                 col = faded(col);
             }
             path(c, g, vp);
@@ -70,17 +74,17 @@ public final class MapPainter {
         }
         // District outlines.
         double lw = Math.clamp(labelSize / 9, 0.8, 2.2);
-        for (Geometry g : data.districtShapes()) {
+        for (Geometry g : data.drawnShapes()) {
             path(c, g, vp);
             c.stroke(0xFFFFFFFF, lw + 1.4);
         }
-        for (Geometry g : data.districtShapes()) {
+        for (Geometry g : data.drawnShapes()) {
             path(c, g, vp);
             c.stroke(OUTLINE, lw);
         }
         if (labels) {
             for (int d = 0; d < data.districts(); d++) {
-                Geometry g = data.districtShapes()[d];
+                Geometry g = data.drawnShapes()[d];
                 if (g.isEmpty()) {
                     continue;
                 }

@@ -44,6 +44,42 @@ class SeatBandsTest {
     }
     
     @Test
+    void spreadIsZeroWhenEachSidesSeatsAreEqual() {
+        assertEquals(0.0, SeatBands.spread(new double[]{0.30, 0.30, 0.60, 0.60}, 2), 1e-9);
+        assertEquals(0.0, SeatBands.spread(new double[]{0.65, 0.65, 0.65}, 3), 1e-9);
+        // A side of one seat has nothing to spread.
+        assertEquals(0.0, SeatBands.spread(new double[]{0.20, 0.70}, 1), 1e-9);
+    }
+    
+    @Test
+    void spreadMeasuresTheWeakSeatsOfEachSideFromItsOwnMean() {
+        // R side 30 and 40 (mean 35): the 40 is the weaker R seat. D side 60 and 70 (mean 65):
+        // the 60 is the weaker D seat. Each is 5 points off; the safer seats don't count.
+        assertEquals(50.0, SeatBands.spread(new double[]{0.70, 0.30, 0.60, 0.40}, 2), 1e-9);
+    }
+    
+    @Test
+    void aPackedSeatCountsOnlyThroughTheSeatsItLeavesWeak() {
+        // Same mean (60) on the D side: one packed seat and two equal ones 5 points under it,
+        // against two equal seats and one marginal seat 10 points under.
+        double packed = SeatBands.spread(new double[]{0.55, 0.55, 0.70}, 3);
+        double marginal = SeatBands.spread(new double[]{0.50, 0.65, 0.65}, 3);
+        assertEquals(50.0, packed, 1e-9);
+        assertEquals(100.0, marginal, 1e-9);
+    }
+    
+    @Test
+    void evenlySafeSeatsScoreBetterThanPackedAndMarginalOnes() {
+        // Three D seats, every one inside its band either way, with the same average.
+        double[] packed = {0.52, 0.54, 0.89};
+        double[] even = {0.65, 0.65, 0.65};
+        double hi = SeatBands.hi(2.0);
+        double lo = SeatBands.lo(2.0);
+        assertEquals(0.0, SeatBands.penaltySorted(packed, 3, 3, hi, lo), 0.0);
+        assertTrue(SeatBands.termSorted(even, 3, 3, hi, lo) < SeatBands.termSorted(packed, 3, 3, hi, lo));
+    }
+    
+    @Test
     void replaceTwoMatchesSorting() {
         var rng = new SplittableRandom(1);
         for (int t = 0; t < 2000; t++) {

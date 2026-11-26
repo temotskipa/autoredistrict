@@ -1,6 +1,7 @@
 package com.temotskipa.autoredistrict.render;
 
 import com.temotskipa.autoredistrict.data.Shapefile;
+import com.temotskipa.autoredistrict.data.Shapefile.Field;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
@@ -26,7 +27,7 @@ import java.util.function.Function;
 @SuppressWarnings("preview") // LazyConstant is a preview API, used on purpose
 public final class Exporters {
     
-    private static final List<Shapefile.Field> SHAPEFILE_FIELDS = List.of(Shapefile.Field.number("DISTRICT", 9, 0), Shapefile.Field.number("POP", 19, 0), Shapefile.Field.number("DEV_PCT", 12, 4), Shapefile.Field.number("D_SHARE", 10, 5), Shapefile.Field.text("WINNER", 1), Shapefile.Field.number("MARGIN", 10, 3));
+    private static final List<Field> SHAPEFILE_FIELDS = List.of(Field.number("DISTRICT", 9, 0), Field.number("POP", 19, 0), Field.number("DEV_PCT", 12, 4), Field.number("D_SHARE", 10, 5), Field.text("WINNER", 1), Field.number("MARGIN", 10, 3));
     
     private static final LazyConstant<JsonMapper> JSON = LazyConstant.of(() -> JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build());
     

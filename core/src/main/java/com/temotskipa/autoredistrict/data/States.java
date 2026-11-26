@@ -33,6 +33,13 @@ public final class States {
     }
     
     /**
+     * The 44 states with more than one seat, the ones with maps to draw, in the same order.
+     */
+    public static List<StateInfo> districted() {
+        return ALL.stream().filter(s -> !s.atLarge()).toList();
+    }
+    
+    /**
      * Finds a state by postal abbreviation (any case) or 1–2 digit FIPS code.
      */
     public static Optional<StateInfo> find(String abbrOrFips) {
