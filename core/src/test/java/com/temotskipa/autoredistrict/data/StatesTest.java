@@ -5,7 +5,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 import java.util.OptionalInt;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Ported from the Python tests/test_apportionment.py.
@@ -47,8 +48,7 @@ class StatesTest {
         assertEquals("23", States.require("me").fips());
         assertEquals("NC", States.require("37").abbr());
         assertTrue(States.find("DC").isEmpty());
-        assertTrue(StateInfo.class.isValue());
-        assertSame(new StateInfo("ME", "23", "Maine", 2), States.require("ME"), "value objects compare by value");
+        assertEquals(new StateInfo("ME", "23", "Maine", 2), States.require("ME"));
     }
     
     @Test

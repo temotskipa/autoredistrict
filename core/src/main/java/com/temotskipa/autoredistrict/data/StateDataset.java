@@ -15,7 +15,7 @@ import java.util.List;
  * 2024 block file for it. A state with no votes at all is an error: seat targets need votes.
  */
 @SuppressWarnings("preview") // LazyConstant is a preview API, used on purpose
-public final class StateDataset {
+public value class StateDataset {
     
     private final StateInfo state;
     private final Path dir;
@@ -43,7 +43,9 @@ public final class StateDataset {
         this.used = used;
         this.warnings = List.copyOf(warnings);
         this.geometry = LazyConstant.of(() -> TractCache.readGeometry(dir));
-        this.graph = LazyConstant.of(this::buildGraph);
+        // A value class can't hand out `this` while it is being built, so the graph is built from
+        // the constructor's arguments.
+        this.graph = LazyConstant.of(() -> buildGraph(tracts, edges, dem, rep));
         this.projection = LazyConstant.of(() -> manifest.projection().toProjection());
     }
     
@@ -72,7 +74,7 @@ public final class StateDataset {
         return new StateDataset(state, dir, manifest, tracts, edges, votes[0], votes[1], election, used, warnings);
     }
     
-    private Graph buildGraph() {
+    private static Graph buildGraph(TractCache.Tracts tracts, TractCache.Edges edges, double[] dem, double[] rep) {
         return Graph.of(tracts.pop(), dem, rep, tracts.x(), tracts.y(), tracts.area(), edges.a(), edges.b(), edges.length());
     }
     

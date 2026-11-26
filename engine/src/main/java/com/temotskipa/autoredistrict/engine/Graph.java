@@ -11,7 +11,7 @@ import java.util.Objects;
  * <p>Immutable. Arrays are owned by the graph; accessors return them directly for speed, so
  * callers must not modify them.
  */
-public final class Graph {
+public value class Graph {
     
     private final int n;
     private final int[] pop;

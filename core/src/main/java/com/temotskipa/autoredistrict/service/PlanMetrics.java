@@ -12,7 +12,7 @@ import java.util.List;
  * Metrics of a finished plan, recomputed from scratch from the assignment (not from the engine's
  * tallies), with the checks a PASS needs.
  */
-public record PlanMetrics(int districts, List<DistrictResult> rows, double maxDeviation, boolean allContiguous, boolean assignedOnce, boolean populationMatches, long population, long importedPopulation, int demWon, int repWon, double closestMargin) {
+public value record PlanMetrics(int districts, List<DistrictResult> rows, double maxDeviation, boolean allContiguous, boolean assignedOnce, boolean populationMatches, long population, long importedPopulation, int demWon, int repWon, double closestMargin) {
     
     public static PlanMetrics compute(StateDataset ds, int[] assignment, int k) {
         Graph g = ds.graph();

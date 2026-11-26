@@ -28,7 +28,8 @@ Each Gradle project is a named Java module `com.temotskipa.autoredistrict.<proje
 ## Development guidelines
 
 - Build with the Gradle wrapper: `.\gradlew.bat test` must pass before a change is done. Tests live in each module's
-  `src/test/java`; fixtures are small synthetic files in `src/test/resources` or built by the tests.
+  `src/test/java`; fixtures are small synthetic files in `src/test/resources` or built by the tests. Tests check
+  behaviour, not implementation details such as whether a type is a value class.
 - The toolchain is JDK 28 EA in `~/.jdks`. `--enable-preview` and the launch flags live in the `build-logic` included
   build (`JvmFlags`, the `autoredistrict.java-conventions` and `autoredistrict.application-conventions` plugins); don't
   add them per module.

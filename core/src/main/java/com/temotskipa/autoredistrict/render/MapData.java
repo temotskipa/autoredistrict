@@ -12,7 +12,7 @@ import java.util.List;
  * northwestern islands) don't shrink the map. {@code empty} (may be null) marks tracts without
  * people (mostly water), which are drawn in a pale tint.
  */
-public record MapData(String title, String subtitle, List<Geometry> tracts, int[] assignment, int districts, double[] demShare, Geometry[] districtShapes, Envelope focus, boolean[] empty) {
+public value record MapData(String title, String subtitle, List<Geometry> tracts, int[] assignment, int districts, double[] demShare, Geometry[] districtShapes, Envelope focus, boolean[] empty) {
     
     public static MapData of(String title, String subtitle, List<Geometry> tracts, int[] assignment, int districts, double[] demShare) {
         return of(title, subtitle, tracts, assignment, districts, demShare, null, null);

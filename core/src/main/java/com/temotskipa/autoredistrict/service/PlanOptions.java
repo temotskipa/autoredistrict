@@ -15,7 +15,7 @@ import java.time.Duration;
  * @param timeBudget    per-chain wall-clock limit, positive (null for none)
  * @param tolerance     population tolerance as a fraction (0.01 = 1%)
  */
-public record PlanOptions(Integer demSeats, double minMargin, int seeds, long baseSeed, double scheduleScale, Duration timeBudget, double tolerance) {
+public value record PlanOptions(Integer demSeats, double minMargin, int seeds, long baseSeed, double scheduleScale, Duration timeBudget, double tolerance) {
     
     public static final double DEFAULT_MARGIN = 2.0;
     public static final double DEFAULT_TOLERANCE = 0.01;

@@ -168,6 +168,6 @@ public final class Exporters {
     /**
      * Properties of one district for the exports.
      */
-    public record DistrictProps(int district, long population, double deviationPct, double demShare, String winner, double marginPts) {
+    public value record DistrictProps(int district, long population, double deviationPct, double demShare, String winner, double marginPts) {
     }
 }

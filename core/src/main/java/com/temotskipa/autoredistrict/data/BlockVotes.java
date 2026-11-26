@@ -178,7 +178,7 @@ public final class BlockVotes {
     /**
      * D and R votes per tract GEOID for one state and election, with coverage counts.
      */
-    public record TractVotes(Election election, String source, Map<String, double[]> byTract, double dem, double rep, long blocks, long blocksOutside, double totPop) {
+    public value record TractVotes(Election election, String source, Map<String, double[]> byTract, double dem, double rep, long blocks, long blocksOutside, double totPop) {
         
         public double demShare() {
             double t = dem + rep;

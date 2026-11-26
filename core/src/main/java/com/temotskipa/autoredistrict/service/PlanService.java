@@ -15,7 +15,7 @@ import java.util.List;
  * Runs plan requests on cached states. Both front ends call this; it never imports or touches
  * the network.
  */
-public record PlanService(Path cacheRoot) {
+public value record PlanService(Path cacheRoot) {
     
     public StateDataset load(StateInfo state, Election election) {
         return StateDataset.load(cacheRoot, state, election);

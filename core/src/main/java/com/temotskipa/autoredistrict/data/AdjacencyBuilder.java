@@ -202,7 +202,7 @@ public final class AdjacencyBuilder {
      * @param hashedPairs   pairs with at least one segment matched by the hash
      * @param fallbackPairs pairs whose border the hash missed by at least {@link #MIN_SHARED_METRES}, in whole or in part
      */
-    public record Adjacency(int[] a, int[] b, double[] length, double[] perimeter, double[] outer, int hashedPairs, int fallbackPairs) {
+    public value record Adjacency(int[] a, int[] b, double[] length, double[] perimeter, double[] outer, int hashedPairs, int fallbackPairs) {
         
         public int edgeCount() {
             return a.length;

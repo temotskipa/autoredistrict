@@ -310,7 +310,7 @@ public final class StateImporter {
     /**
      * A state that imported: one line of the import summary table.
      */
-    public record ImportSummary(StateInfo state, int tracts, long population, int edges, int bridges, int componentsBefore, int fallbackPairs, String defaultElection, double dem, double rep, long tractsWithoutVotes, long blocksOutside, double seconds, List<String> warnings) implements ImportResult {
+    public value record ImportSummary(StateInfo state, int tracts, long population, int edges, int bridges, int componentsBefore, int fallbackPairs, String defaultElection, double dem, double rep, long tractsWithoutVotes, long blocksOutside, double seconds, List<String> warnings) implements ImportResult {
         
         public double demShare() {
             return dem + rep > 0 ? dem / (dem + rep) : 0.5;
@@ -320,7 +320,7 @@ public final class StateImporter {
     /**
      * A state whose import failed after {@code seconds}, with the error.
      */
-    public record ImportFailure(StateInfo state, double seconds, String error) implements ImportResult {
+    public value record ImportFailure(StateInfo state, double seconds, String error) implements ImportResult {
     }
     
     /**

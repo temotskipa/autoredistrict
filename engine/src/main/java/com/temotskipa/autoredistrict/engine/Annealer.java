@@ -137,7 +137,7 @@ public final class Annealer {
      * @param finished  chains 0 to the first accepted one (all of them if none was), in seed order
      * @param proposals proposals made by every chain, including the cancelled ones
      */
-    public record Until(List<ChainResult> finished, long proposals) {
+    public value record Until(List<ChainResult> finished, long proposals) {
     }
     
     /**

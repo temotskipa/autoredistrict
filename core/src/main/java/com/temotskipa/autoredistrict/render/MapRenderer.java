@@ -117,6 +117,6 @@ public final class MapRenderer {
     /**
      * One tile of the contact sheet.
      */
-    public record Tile(String caption, BufferedImage image) {
+    public value record Tile(String caption, BufferedImage image) {
     }
 }

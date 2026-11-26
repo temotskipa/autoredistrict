@@ -14,7 +14,7 @@ import javafx.scene.text.TextAlignment;
 /**
  * {@link Canvas2D} on a JavaFX {@link GraphicsContext}, so the GUI draws with the shared MapPainter.
  */
-final class FxCanvas implements Canvas2D {
+value class FxCanvas implements Canvas2D {
     
     private final GraphicsContext g;
     

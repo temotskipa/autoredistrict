@@ -167,7 +167,7 @@ public final class BatchRunner {
     /**
      * One summary row.
      */
-    public record Row(String abbr, String fips, int seats, int tracts, long population, double maxDeviationPct, boolean contiguous, boolean assignedOnce, boolean populationMatches, int demRequested, int demWon, int repWon, boolean hit, double closestMargin, double flipsPerSecond, double seconds, String voteData, Outcome outcome) {
+    public value record Row(String abbr, String fips, int seats, int tracts, long population, double maxDeviationPct, boolean contiguous, boolean assignedOnce, boolean populationMatches, int demRequested, int demWon, int repWon, boolean hit, double closestMargin, double flipsPerSecond, double seconds, String voteData, Outcome outcome) {
         
         public boolean pass() {
             return outcome instanceof Passed;
@@ -189,7 +189,7 @@ public final class BatchRunner {
     /**
      * The batch as a whole.
      */
-    public record Summary(List<Row> rows, double wallSeconds, int totalSeats) {
+    public value record Summary(List<Row> rows, double wallSeconds, int totalSeats) {
         
         public long passCount() {
             return rows.stream().filter(Row::pass).count();

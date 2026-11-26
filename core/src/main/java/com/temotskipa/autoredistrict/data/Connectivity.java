@@ -115,7 +115,7 @@ public final class Connectivity {
     /**
      * Result: the bridges added and how many components there were before.
      */
-    public record Repair(List<Bridge> bridges, int componentsBefore) {
+    public value record Repair(List<Bridge> bridges, int componentsBefore) {
     }
     
     static final class UnionFind {

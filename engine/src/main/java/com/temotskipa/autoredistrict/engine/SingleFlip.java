@@ -9,7 +9,7 @@ import java.util.SplittableRandom;
  * move is the pruning move instead (the unit and the small piece it cuts off), which takes one
  * Metropolis test of its own on the whole move's score change.
  */
-public final class SingleFlip implements MoveKernel {
+public value class SingleFlip implements MoveKernel {
     
     public static final SingleFlip INSTANCE = new SingleFlip();
     

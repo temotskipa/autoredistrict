@@ -26,7 +26,7 @@ import java.util.logging.Logger;
  * <p>Alaska's Aleutians cross the antimeridian. Longitudes are unwrapped to within 180 degrees of
  * the central meridian before projecting, so they land west of the rest of the state.
  */
-public final class AlbersProjection {
+public value class AlbersProjection {
     
     /**
      * NAD83 as RDH's {@code .prj} files spell it.

@@ -137,6 +137,6 @@ public final class Artifacts {
     /**
      * The JSON report: request, result, checks and per-district rows.
      */
-    public record Report(String state, String fips, int districts, int demRequested, boolean proportionalDefault, double minMargin, String voteData, double statewideDemShare, int demWon, int repWon, boolean hit, boolean pass, double tolerancePct, double maxDeviationPct, boolean allContiguous, boolean assignedOnce, boolean populationMatches, long population, long importedPopulation, double closestMargin, int seeds, long baseSeed, int bestChain, int chainsHit, long proposals, double flipsPerSecond, double seconds, String schedule, List<String> warnings, List<DistrictResult> districtRows) {
+    public value record Report(String state, String fips, int districts, int demRequested, boolean proportionalDefault, double minMargin, String voteData, double statewideDemShare, int demWon, int repWon, boolean hit, boolean pass, double tolerancePct, double maxDeviationPct, boolean allContiguous, boolean assignedOnce, boolean populationMatches, long population, long importedPopulation, double closestMargin, int seeds, long baseSeed, int bestChain, int chainsHit, long proposals, double flipsPerSecond, double seconds, String schedule, List<String> warnings, List<DistrictResult> districtRows) {
     }
 }

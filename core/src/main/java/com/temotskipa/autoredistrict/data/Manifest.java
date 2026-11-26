@@ -7,7 +7,7 @@ import java.util.TreeMap;
 /**
  * {@code manifest.json} of one imported state in the cache.
  */
-public record Manifest(int format, String state, String fips, String name, int seats, String source, List<InputFile> inputFiles, List<String> memberFiles, String importedAt, int tracts, long population, int edges, int hashedPairs, int fallbackPairs, int componentsBefore, List<BridgeInfo> bridges, ProjectionInfo projection, double simplifyToleranceMetres, Map<String, VoteInfo> votes, List<String> warnings) {
+public value record Manifest(int format, String state, String fips, String name, int seats, String source, List<InputFile> inputFiles, List<String> memberFiles, String importedAt, int tracts, long population, int edges, int hashedPairs, int fallbackPairs, int componentsBefore, List<BridgeInfo> bridges, ProjectionInfo projection, double simplifyToleranceMetres, Map<String, VoteInfo> votes, List<String> warnings) {
     
     public static final int FORMAT = 1;
     
@@ -20,19 +20,19 @@ public record Manifest(int format, String state, String fips, String name, int s
     /**
      * An input file with its SHA-256.
      */
-    public record InputFile(String name, String sha256, long bytes) {
+    public value record InputFile(String name, String sha256, long bytes) {
     }
     
     /**
      * A bridge edge, by GEOID.
      */
-    public record BridgeInfo(String a, String b, double gapMetres) {
+    public value record BridgeInfo(String a, String b, double gapMetres) {
     }
     
     /**
      * The state's Albers parameters.
      */
-    public record ProjectionInfo(double lat1, double lat2, double lat0, double lon0, String geographicWkt, String wkt) {
+    public value record ProjectionInfo(double lat1, double lat2, double lat0, double lon0, String geographicWkt, String wkt) {
         
         public AlbersProjection toProjection() {
             return AlbersProjection.of(lat1, lat2, lat0, lon0, geographicWkt);
@@ -42,6 +42,6 @@ public record Manifest(int format, String state, String fips, String name, int s
     /**
      * Votes cached for one election.
      */
-    public record VoteInfo(String election, String source, String sha256, double dem, double rep, double demShare, long blocks, long blocksOutside, long tractsMissing, Double totPop, String warning) {
+    public value record VoteInfo(String election, String source, String sha256, double dem, double rep, double demShare, long blocks, long blocksOutside, long tractsMissing, Double totPop, String warning) {
     }
 }

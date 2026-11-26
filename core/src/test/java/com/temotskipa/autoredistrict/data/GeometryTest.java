@@ -198,6 +198,5 @@ class GeometryTest {
         uf.union(adj.a()[0], adj.b()[0]);
         repair.bridges().forEach(br -> uf.union(br.a(), br.b()));
         assertEquals(1, uf.count());
-        assertSame(new Connectivity.Bridge(1, 2, 30.0), new Connectivity.Bridge(1, 2, 30.0), "value objects compare by value");
     }
 }

@@ -12,7 +12,7 @@ import java.util.SplittableRandom;
  * distances (multi-source Dijkstra). Each district is a shortest-path tree, so all are contiguous
  * from the start; like the video's random Voronoi start, they are deliberately unbalanced.
  */
-public final class GraphVoronoi implements InitialMap {
+public value class GraphVoronoi implements InitialMap {
     
     public static final GraphVoronoi INSTANCE = new GraphVoronoi();
     

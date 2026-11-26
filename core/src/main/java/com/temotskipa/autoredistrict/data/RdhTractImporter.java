@@ -419,7 +419,7 @@ public final class RdhTractImporter {
     /**
      * One state's tracts: counts joined to lon/lat geometry.
      */
-    public record TractLayer(String stateFips, List<String> geoids, List<String> names, int[] pop, List<Geometry> geometries, String geographicWkt, List<String> memberFiles, List<String> warnings) {
+    public value record TractLayer(String stateFips, List<String> geoids, List<String> names, int[] pop, List<Geometry> geometries, String geographicWkt, List<String> memberFiles, List<String> warnings) {
         
         public int size() {
             return geoids.size();
@@ -437,7 +437,7 @@ public final class RdhTractImporter {
     /**
      * A layer read from one .shp or .csv file.
      */
-    private record Layer(Path source, List<String> geoids, List<String> names, long[] pop, List<Geometry> geometries, String prjWkt, String stateFips, String resolution) {
+    private value record Layer(Path source, List<String> geoids, List<String> names, long[] pop, List<Geometry> geometries, String prjWkt, String stateFips, String resolution) {
         
         boolean hasCounts() {
             return pop != null;

@@ -151,6 +151,6 @@ final class Fixtures {
         return in;
     }
     
-    record Tract(String geoid, String name, long pop, Geometry geometry) {
+    value record Tract(String geoid, String name, long pop, Geometry geometry) {
     }
 }
